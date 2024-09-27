@@ -91,7 +91,7 @@ workflow SARSCOVSEQ() {
 
 
     //
-    // MODULE: AMPLIGONE
+    // MODULE: AMPLIGONE.
     //    
 
     AMPLIGONE (
