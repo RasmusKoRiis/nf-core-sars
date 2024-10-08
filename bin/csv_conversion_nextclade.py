@@ -20,8 +20,8 @@ def extract_mutations(mutation_str, gene_segment):
 
 
 # Extract the first smaller CSV columns
-nextclade_stats = df[['seqName', 'clade', 'Nextclade_pango', 'partiallyAliased', 'clade_nextstrain', 'clade_who','qc.mixedSites.totalMixedSites']]
-nextclade_stats.columns = ['Sample', 'clade', 'Nextclade_pango', 'partiallyAliased', 'clade_nextstrain', 'clade_who','qc.mixedSites.totalMixedSites']
+nextclade_stats = df[['seqName', 'clade', 'Nextclade_pango', 'partiallyAliased', 'clade_nextstrain', 'clade_who','qc.mixedSites.totalMixedSites', 'coverage']]
+nextclade_stats.columns = ['Sample', 'clade', 'Nextclade_pango', 'partiallyAliased', 'clade_nextstrain', 'clade_who','qc.mixedSites.totalMixedSites', 'coverage']
 
 # Extract the second smaller CSV columns for amino acid changes
 nextclade_mutations = df[['seqName', 'aaSubstitutions', 'aaDeletions', 'aaInsertions']]
