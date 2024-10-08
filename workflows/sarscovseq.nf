@@ -14,6 +14,7 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_sars
 
 include { CAT_FASTQ                   } from '../modules/nf-core/cat/fastq/main'
 include { AMPLIGONE                   } from '../modules/local/ampligone/main'
+include { CHOPPER                     } from '../modules/local/chopper/main'
 include { IRMA                        } from '../modules/local/irma/main'
 include { NEXTCLADE                   } from '../modules/local/nextclade/main'
 include { CSV_CONVERSION              } from '../modules/local/csv_conversion/main'
@@ -89,14 +90,25 @@ workflow SARSCOVSEQ() {
     )
     ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first())
 
+    //
+    // MODULE: CHOPPER
+    //  
+    
+    CHOPPER (
+        CAT_FASTQ.out.reads
+    )
+
+
 
     //
     // MODULE: AMPLIGONE.
     //    
 
     AMPLIGONE (
-        CAT_FASTQ.out.reads, primerdir
+        CHOPPER.out.chopperfastq, primerdir
     )
+
+
 
 
     //
