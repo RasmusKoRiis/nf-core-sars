@@ -20,6 +20,7 @@ include { NEXTCLADE                   } from '../modules/local/nextclade/main'
 include { CSV_CONVERSION              } from '../modules/local/csv_conversion/main'
 include { TABLELOOKUP                 } from '../modules/local/tablelookup/main'
 include { REPORT                      } from '../modules/local/report/main'
+include { DEPTH_ANALYSIS              } from '../modules/local/depth_analysis/main'
 
 
 
@@ -109,8 +110,6 @@ workflow SARSCOVSEQ() {
     )
 
 
-
-
     //
     // MODULE: IRMA
     //
@@ -118,6 +117,15 @@ workflow SARSCOVSEQ() {
     IRMA (
         AMPLIGONE.out.primertrimmedfastq
     )
+
+    //
+    // MODULE: DEPTH ANALYSIS
+    //
+
+    DEPTH_ANALYSIS (
+        IRMA.out.bam
+    )
+
 
 
     //
@@ -163,7 +171,6 @@ workflow SARSCOVSEQ() {
         runid,
         seq_instrument,
         samplesheet
- 
     )
 
 
