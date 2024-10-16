@@ -35,6 +35,9 @@ process REPORT {
     # Add Instrument ID column
     awk -v seq_instrument=${seq_instrument} -v OFS=',' '{ if (NR == 1) { print  \$0, "Instrument ID" } else { print  \$0, seq_instrument } }' ${runid}_temp1.csv > ${runid}_temp2.csv
 
+
+
+
     # Rename the final file to runID
     mv ${runid}_temp2.csv ${runid}.csv
 

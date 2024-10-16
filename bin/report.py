@@ -2,12 +2,12 @@ import pandas as pd
 import glob
 import sys
 
-#MERGE ALL DATA
+# MERGE ALL DATA
 # Get a list of all CSV files in the current directory
 csv_files = glob.glob('*.csv')
 samplesheet = sys.argv[1]
 
-#LOAD SAMPLE SHEET
+# LOAD SAMPLE SHEET
 samplesheet_df = pd.read_csv(samplesheet, sep='\t')
 
 # Rename the column
@@ -33,11 +33,12 @@ for i, file in enumerate(csv_files):
 # Group by 'Sample' and combine the rows
 merged_data = merged_data.groupby('Sample', as_index=False).first()
 
-#NIPH spesific adustment
-#replace ! with - in the Sample column 
+# NIPH specific adjustment
+# Replace ! with - in the Sample column
 merged_data['Sample'] = merged_data['Sample'].str.replace('!', '-')
 
+# Sort alphabetically with 'Sample' first
+merged_data = merged_data[['Sample'] + sorted([col for col in merged_data.columns if col != 'Sample'])]
 
 # Write the merged data to a new CSV file
 merged_data.to_csv('merged_report.csv', index=False)
-
