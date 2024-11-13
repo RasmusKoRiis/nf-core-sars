@@ -33,9 +33,6 @@ process DEPTH_ANALYSIS {
     script:
     """
 
-
-
-    #NEXTCLADE CONVERSION
     python3 /project-bin/depth_analysis.py  \
                 ${bam} \
                 ${meta.id} 
