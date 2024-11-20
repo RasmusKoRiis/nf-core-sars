@@ -37,7 +37,7 @@ for segment in gene_segments:
 nextclade_mutations = nextclade_mutations.drop(columns=['aaSubstitutions', 'aaDeletions', 'aaInsertions'])
 
 # Function to split 'S_aaSubstitutions' into 4 parts according to the custom rules
-def split_s_aa_substitutions(substitutions):
+def split_aa_substitutions(substitutions):
     if pd.isna(substitutions) or substitutions == "No mutation":
         return ["No mutation"] * 4
     changes = substitutions.split(',')
@@ -50,9 +50,15 @@ def split_s_aa_substitutions(substitutions):
     else:
         return [",".join(changes[:22]), ",".join(changes[22:44]), ",".join(changes[44:66]), ",".join(changes[66:])]
 
+
+
 # Modify the creation of S_aaSubstitutions to split it into 4 columns
 nextclade_mutations[['S_aaSubstitutions_1', 'S_aaSubstitutions_2', 'S_aaSubstitutions_3', 'S_aaSubstitutions_4']] = \
-    pd.DataFrame(nextclade_mutations['S_aaSubstitutions'].apply(split_s_aa_substitutions).tolist(), index=nextclade_mutations.index)
+    pd.DataFrame(nextclade_mutations['S_aaSubstitutions'].apply(split_aa_substitutions).tolist(), index=nextclade_mutations.index)
+
+# Modify the creation of S_aaSubstitutions to split it into 4 columns
+nextclade_mutations[['ORF1a_aaSubstitutions_1', 'ORF1a_aaSubstitutions_2', 'ORF1a_aaSubstitutions_3', 'ORF1a_aaSubstitutions_4']] = \
+    pd.DataFrame(nextclade_mutations['ORF1a_aaSubstitutions'].apply(split_aa_substitutions).tolist(), index=nextclade_mutations.index)
 
 # Now drop the original S_aaSubstitutions column
 #nextclade_mutations = nextclade_mutations.drop(columns=['S_aaSubstitutions'])

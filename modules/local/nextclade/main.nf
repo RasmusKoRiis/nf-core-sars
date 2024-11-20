@@ -25,7 +25,6 @@ process NEXTCLADE {
 
     script:
     """
-    
     nextclade dataset get --name 'nextstrain/sars-cov-2/wuhan-hu-1/orfs' --output-dir "${meta.id}_whuan_nextclade_dataset/"
 
     nextclade run \
