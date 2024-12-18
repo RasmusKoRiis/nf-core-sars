@@ -53,7 +53,7 @@ def parseSampleSheet(sampleSheetPath) {
 
             // Check if there are any files in the list
             if (!files || files.size() == 0) {
-                error "No FastQ files for sample ${sampleId} found in ${files}"
+                error "No FastQ files for sample ${sampleId} found in ${files}, ${params.samplesDir}/${row.Barcode}/*.fastq.gz"
             }
 
             // Creating a metadata map
