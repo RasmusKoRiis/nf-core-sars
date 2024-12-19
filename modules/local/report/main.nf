@@ -14,6 +14,7 @@ process REPORT {
     val runid
     val seq_instrument
     path(samplesheet)
+    val primer
     
     output:
     path("${runid}.csv"), emit: report
@@ -35,11 +36,18 @@ process REPORT {
     # Add Instrument ID column
     awk -v seq_instrument=${seq_instrument} -v OFS=',' '{ if (NR == 1) { print  \$0, "Instrument ID" } else { print  \$0, seq_instrument } }' ${runid}_temp1.csv > ${runid}_temp2.csv
 
-
+    # Add primer scheme used
+    awk -v primer=\$(basename ${primer}) -v OFS=',' '{
+        if (NR == 1) { 
+            print \$0, "Primer" 
+        } else { 
+            print \$0, primer 
+        } 
+    }' ${runid}_temp2.csv > ${runid}_temp3.csv
 
 
     # Rename the final file to runID
-    mv ${runid}_temp2.csv ${runid}.csv
+    mv ${runid}_temp3.csv ${runid}.csv
 
     
     """

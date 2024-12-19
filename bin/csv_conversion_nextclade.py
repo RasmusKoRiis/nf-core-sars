@@ -67,6 +67,11 @@ nextclade_mutations[['ORF1a_aaSubstitutions_1', 'ORF1a_aaSubstitutions_2', 'ORF1
 mutation_name = id + '_nextclade_mutations.csv'
 stat_name = id + '_' + "nextclade_stats.csv"
 
+# Replace all commas within any cell value with semicolons
+nextclade_stats = nextclade_stats.applymap(lambda x: x.replace(',', ';') if isinstance(x, str) else x)
+nextclade_mutations = nextclade_mutations.applymap(lambda x: x.replace(',', ';') if isinstance(x, str) else x)
+
 nextclade_stats.to_csv(stat_name, index=False)
 nextclade_mutations.to_csv(mutation_name, index=False)
+
 

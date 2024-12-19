@@ -162,7 +162,8 @@ workflow SARSCOVSEQ() {
     //
 
     def runid = params.runid
-    def seq_instrument   = params.seq_instrument  
+    def seq_instrument   = params.seq_instrument
+    def primer   = params.primerdir   
     def samplesheet = "${currentDir}/assets/samplesheet.tsv"
 
     REPORT (
@@ -171,7 +172,8 @@ workflow SARSCOVSEQ() {
         TABLELOOKUP.out.resistance_mutations_report.collect(),
         runid,
         seq_instrument,
-        samplesheet
+        samplesheet,
+        primer
     )
 
 

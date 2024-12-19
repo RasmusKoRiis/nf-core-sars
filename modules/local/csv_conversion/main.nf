@@ -37,9 +37,6 @@ process CSV_CONVERSION {
     script:
     """
 
-
-
-
     #NEXTCLADE CONVERSION
     python3 /project-bin/csv_conversion_nextclade.py  \
                 ${csv} \
