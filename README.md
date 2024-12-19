@@ -65,13 +65,14 @@ Navigate to the `nf-core-sars` folder and execute the following command with def
 #### SARS-CoV-2 FASTQ analysis
 
 ```bash
-nextflow run main.nf -profile docker --runid runid_name --input samplesheet.csv --outdir ../outdir_name
+nextflow run main.nf -profile docker --runid runid_name  --primerdir primer_folder  --input samplesheet.csv --outdir ../outdir_name
 ```
 
 ### Important Parameters
 
 - `--input` (default: `assets/samplesheet.csv`): Path to the samplesheet.
 - `--samplesDir` (default: `../data`): Directory containing the FASTQ files in the structure given above.
+- `--primerdir` (default: `assets/V5.4.2/`): Directory containing the primers used during amplification of target region(s).
 
 All parameters are detailed in the `nextflow.config` file.
 
