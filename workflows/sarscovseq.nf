@@ -161,8 +161,7 @@ workflow SARSCOVSEQ() {
     def runid = params.runid
     def seq_instrument   = params.seq_instrument
     def primer   = "${params.primerdir}" 
-    def samplesheet = "${currentDir}/assets/samplesheet.tsv"
-     def release_version = params.release_version
+    def release_version = params.release_version
 
 
     REPORT (
@@ -172,7 +171,7 @@ workflow SARSCOVSEQ() {
         runid,
         release_version,
         seq_instrument,
-        samplesheet,
+        Channel.value(file(params.input)),
         primer
     )
 
