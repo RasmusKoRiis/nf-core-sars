@@ -68,7 +68,7 @@ workflow SARSCOVSEQ() {
     main:
 
     def currentDir = System.getProperty('user.dir')
-    def primerdir = "${params.primerdir}"
+    
 
 
     ch_sample_information = parseSampleSheet(params.input) // Use params.input directly
@@ -106,8 +106,9 @@ workflow SARSCOVSEQ() {
     //    
 
     AMPLIGONE (
-        CHOPPER.out.chopperfastq, primerdir
+        CHOPPER.out.chopperfastq, Channel.value(file(params.primerdir))
     )
+
 
 
 
