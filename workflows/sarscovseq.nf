@@ -150,12 +150,8 @@ workflow SARSCOVSEQ() {
     // MODULE: NEXTCLADE CONVERSION
     //
 
-    def spike = "${currentDir}/${params.spike}"
-    def rdrp = "${currentDir}/${params.rdrp}"
-    def clpro = "${currentDir}/${params.clpro}"
-
     TABLELOOKUP (
-        CSV_CONVERSION.out.nextclade_mutations, spike, rdrp, clpro
+        CSV_CONVERSION.out.nextclade_mutations, Channel.value(file(params.spike)), Channel.value(file(params.rdrp)), Channel.value(file(params.clpro))
     )
 
     //
