@@ -31,7 +31,10 @@ process REPORT {
     # Generate date
     current_date=\$(date '+%Y-%m-%d')
 
-    python /project-bin/report.py ${samplesheet}
+    #turn csv int tsv
+    sed 's/,/\t/g' ${samplesheet} > samplesheet.tsv
+
+    python /project-bin/report.py samplesheet.tsv
 
     #Add constant parameters to the report
     # Add RunID column
