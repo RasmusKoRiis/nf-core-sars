@@ -67,7 +67,7 @@ workflow SARSCOVSEQ() {
 
     main:
 
-    //def currentDir = System.getProperty('user.dir')
+    def currentDir = System.getProperty('user.dir')
     def primerdir = "${params.primerdir}"
 
 
