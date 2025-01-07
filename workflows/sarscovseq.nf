@@ -165,12 +165,15 @@ workflow SARSCOVSEQ() {
     def seq_instrument   = params.seq_instrument
     def primer   = params.primerdir   
     def samplesheet = "${currentDir}/assets/samplesheet.tsv"
+     def release_version = params.release_version
+
 
     REPORT (
         CSV_CONVERSION.out.nextclade_stats_report.collect(), 
         CSV_CONVERSION.out.nextclade_mutations_report.collect(), 
         TABLELOOKUP.out.resistance_mutations_report.collect(),
         runid,
+        release_version,
         seq_instrument,
         samplesheet,
         primer

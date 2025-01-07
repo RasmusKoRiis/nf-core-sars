@@ -12,6 +12,7 @@ process REPORT {
     path(nextclade_mutations)
     path(resistance_mutations)
     val runid
+    val release_version
     val seq_instrument
     path(samplesheet)
     val primer
@@ -27,6 +28,9 @@ process REPORT {
 
     script:
     """ 
+    # Generate date
+    current_date=\$(date '+%Y-%m-%d')
+
     python /project-bin/report.py ${samplesheet}
 
     #Add constant parameters to the report
@@ -45,9 +49,13 @@ process REPORT {
         } 
     }' ${runid}_temp2.csv > ${runid}_temp3.csv
 
+    # Add Date column
+    awk -v date="\$current_date" -v OFS=',' '{ if (NR == 1) { print \$0, "Date" } else { print \$0, date } }' ${runid}_temp3.csv > ${runid}_temp4.csv
 
-    # Rename the final file to runID
-    mv ${runid}_temp3.csv ${runid}.csv
+    # Add Release Version column
+    awk -v version="${release_version}" -v OFS=',' '{ if (NR == 1) { print \$0, "Release Version" } else { print \$0, version } }' ${runid}_temp4.csv > ${runid}.csv
+
+
 
     
     """
