@@ -67,8 +67,8 @@ workflow SARSCOVSEQ() {
 
     main:
 
-    def currentDir = System.getProperty('user.dir')
-    def primerdir = "${currentDir}/${params.primerdir}"
+    //def currentDir = System.getProperty('user.dir')
+    def primerdir = "${params.primerdir}"
 
 
     ch_sample_information = parseSampleSheet(params.input) // Use params.input directly
@@ -163,7 +163,7 @@ workflow SARSCOVSEQ() {
 
     def runid = params.runid
     def seq_instrument   = params.seq_instrument
-    def primer   = params.primerdir   
+    def primer   = "${params.primerdir}" 
     def samplesheet = "${currentDir}/assets/samplesheet.tsv"
      def release_version = params.release_version
 
