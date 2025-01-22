@@ -36,7 +36,6 @@ include { DEPTH_ANALYSIS              } from '../modules/local/depth_analysis/ma
 
 
 // Function to parse the sample sheet
-// Function to parse the sample sheet
 def parseSampleSheet(sampleSheetPath) {
     return Channel
         .fromPath(sampleSheetPath)
@@ -53,13 +52,15 @@ def parseSampleSheet(sampleSheetPath) {
 
             // Check if there are any files in the list
             if (!files || files.size() == 0) {
-                error "No FastQ files for sample ${sampleId} found in ${files}, ${params.samplesDir}/${row.Barcode}/*.fastq.gz"
+                log.warn "Skipping sample ${sampleId}: No FASTQ files found in ${files}"
+                return null // Return null to allow filtering out later
             }
 
             // Creating a metadata map
             def meta = [ id: sampleId, single_end: true ]
             return tuple(meta, files)
         }
+        .filter { it != null } // Remove null entries (samples with no FASTQ files)
 }
 
 
