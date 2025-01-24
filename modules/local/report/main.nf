@@ -20,6 +20,7 @@ process REPORT {
     
     output:
     path("${runid}.csv"), emit: report
+    path("${runid}.fasta"), emit: report_fasta
 
 
 
