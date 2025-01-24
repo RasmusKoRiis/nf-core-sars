@@ -175,7 +175,7 @@ workflow SARSCOVSEQ() {
         seq_instrument,
         Channel.value(file(params.input)),
         primer,
-        IRMA.out.amended_consensus.collect()
+        IRMA.out.amended_consensus_report.collect()
     )
 
 
