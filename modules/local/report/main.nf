@@ -16,6 +16,7 @@ process REPORT {
     val seq_instrument
     path(samplesheet)
     val primer
+    path(fasta)
     
     output:
     path("${runid}.csv"), emit: report
@@ -58,8 +59,8 @@ process REPORT {
     # Add Release Version column
     awk -v version="${release_version}" -v OFS=',' '{ if (NR == 1) { print \$0, "Release Version" } else { print \$0, version } }' ${runid}_temp4.csv > ${runid}.csv
 
-
-
+    # Make Multiple FASTA file for all samples
+    cat ${fasta} > ${runid}.fasta
     
     """
 
