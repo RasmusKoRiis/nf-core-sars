@@ -10,7 +10,7 @@ process AMPLIGONE {
     path(primerdir)
 
     output:
-    tuple val(meta), path("*fastq") , emit: primertrimmedfastq
+    tuple val(meta), path("${meta.id}_primer_cleaned.fastq") , emit: primertrimmedfastq
 
     when:
     task.ext.when == null || task.ext.when
@@ -20,7 +20,7 @@ process AMPLIGONE {
 
     ampligone \
         --input $fastq\
-        --output ${meta.id}.fastq \
+        --output ${meta.id}_primer_cleaned.fastq \
         --reference $primerdir/SARS-CoV-2.reference.fasta \
         --primers $primerdir/SARS-CoV-2.scheme.bed \
         --export-primers ${meta.id}_removed_coordinates.bed \
