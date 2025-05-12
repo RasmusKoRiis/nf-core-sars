@@ -100,7 +100,7 @@ workflow SARSCOVSEQ() {
         CAT_FASTQ.out.reads
     )
 
-
+ 
 
     //
     // MODULE: AMPLIGONE.
