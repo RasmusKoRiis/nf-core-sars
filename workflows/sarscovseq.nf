@@ -118,8 +118,12 @@ workflow SARSCOVSEQ() {
     //
 
     IRMA (
-        AMPLIGONE.out.primertrimmedfastq
+        CHOPPER.out.chopperfastq
     )
+
+    //IRMA (
+    //    AMPLIGONE.out.primertrimmedfastq
+    //)
 
 
     //
