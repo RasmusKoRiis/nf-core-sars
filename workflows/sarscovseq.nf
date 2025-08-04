@@ -117,13 +117,10 @@ workflow SARSCOVSEQ() {
     // MODULE: IRMA
     //
 
-    IRMA (
-        CHOPPER.out.chopperfastq
-    )
 
-    //IRMA (
-    //    AMPLIGONE.out.primertrimmedfastq
-    //)
+    IRMA (
+        AMPLIGONE.out.primertrimmedfastq
+    )
 
 
     //
