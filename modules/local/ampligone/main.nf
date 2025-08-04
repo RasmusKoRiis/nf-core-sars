@@ -22,7 +22,7 @@ process AMPLIGONE {
         --input $fastq\
         --output ${meta.id}_primer_cleaned.fastq \
         --reference $primerdir/SARS-CoV-2.reference.fasta \
-        --primers $primerdir/SARS-CoV-2.scheme.bed \
+        --primers $primerdir/SARS-CoV-2.primers.fasta \
         --export-primers ${meta.id}_removed_coordinates.bed \
         --amplicon-type end-to-end
     """
