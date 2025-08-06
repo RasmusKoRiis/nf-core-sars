@@ -9,6 +9,13 @@ Spike = sys.argv[3]
 RdRp = sys.argv[4]
 CLpro = sys.argv[5]
 
+
+# --- helper --------------
+def split_mutations(raw):
+    if pd.isna(raw) or raw.strip().lower() == 'no mutation':
+        return []
+    return [m.strip() for m in re.split(r'[;,]', raw) if m.strip()]
+
 # Function to adjust mutation positions
 def adjust_mutation_position(mutation_str, offset):
     match = re.match(r'^([A-Z])(\d+)([A-Z]|del)$', mutation_str)
@@ -87,15 +94,17 @@ for idx, row in main_df.iterrows():
     orf1b_mutations = row.get('ORF1b_aaSubstitutions', '')
     
     # For Spike mutations
-    s_mutations_list = [m.strip() for m in s_mutations.split(',') if m.strip() and m.strip() != 'No mutation']
+    s_mutations_list = split_mutations(row.get('S_aaSubstitutions', ''))
     spike_found = get_inhibitors_from_list(s_mutations_list, spike_df)
     
     # For ORF1a mutations (3CLpro)
-    adjusted_orf1a_mutations = adjust_mutations_list(orf1a_mutations, 3263)
+    orf1a_raw = row.get('ORF1a_aaSubstitutions', '')
+    adjusted_orf1a_mutations = adjust_mutations_list(';'.join(split_mutations(orf1a_raw)), 3263)
     clpro_found = get_inhibitors_from_list(adjusted_orf1a_mutations, clpro_df)
     
     # For ORF1b mutations (RdRp)
-    adjusted_orf1b_mutations = adjust_mutations_list(orf1b_mutations, 9)
+    orf1b_raw = row.get('ORF1b_aaSubstitutions', '')
+    adjusted_orf1b_mutations = adjust_mutations_list(';'.join(split_mutations(orf1b_raw)), 9)
     rdrp_found = get_inhibitors_from_list(adjusted_orf1b_mutations, rdrp_df)
     
     # Get max fold changes
