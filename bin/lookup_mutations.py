@@ -16,6 +16,31 @@ def split_mutations(raw):
         return []
     return [m.strip() for m in re.split(r'[;,]', raw) if m.strip()]
 
+def normalise_deletion(m):
+    """
+    Turn 'L24-' → 'L24del'  (handles any AA letter + position + '-')
+    Leaves substitutions untouched.
+    """
+    m = m.strip()
+    if m.endswith('-'):
+        return m[:-1] + 'del'
+    return m
+
+import re
+
+def split_and_clean(raw, *, is_deletion=False):
+    """
+    Split on ',' or ';', drop blanks / 'No mutation', strip whitespace,
+    optionally convert deletions to 'del' form.
+    """
+    if pd.isna(raw) or raw.strip().lower() == 'no mutation':
+        return []
+    parts = [p.strip() for p in re.split(r'[;,]', raw) if p.strip()]
+    if is_deletion:
+        parts = [normalise_deletion(p) for p in parts]
+    return parts
+
+
 # Function to adjust mutation positions
 def adjust_mutation_position(mutation_str, offset):
     match = re.match(r'^([A-Z])(\d+)([A-Z]|del)$', mutation_str)
@@ -94,17 +119,23 @@ for idx, row in main_df.iterrows():
     orf1b_mutations = row.get('ORF1b_aaSubstitutions', '')
     
     # For Spike mutations
-    s_mutations_list = split_mutations(row.get('S_aaSubstitutions', ''))
+    s_subs  = split_and_clean(row.get('S_aaSubstitutions', ''))
+    s_dels  = split_and_clean(row.get('S_aaDeletions', ''), is_deletion=True)
+    s_mutations_list = s_subs + s_dels
     spike_found = get_inhibitors_from_list(s_mutations_list, spike_df)
     
     # For ORF1a mutations (3CLpro)
-    orf1a_raw = row.get('ORF1a_aaSubstitutions', '')
-    adjusted_orf1a_mutations = adjust_mutations_list(';'.join(split_mutations(orf1a_raw)), 3263)
+    orf1a_subs = split_and_clean(row.get('ORF1a_aaSubstitutions', ''))
+    orf1a_dels = split_and_clean(row.get('ORF1a_aaDeletions', ''), is_deletion=True)
+    orf1a_all  = orf1a_subs + orf1a_dels
+    adjusted_orf1a_mutations = [adjust_mutation_position(m, 3263) for m in orf1a_all]
     clpro_found = get_inhibitors_from_list(adjusted_orf1a_mutations, clpro_df)
     
     # For ORF1b mutations (RdRp)
-    orf1b_raw = row.get('ORF1b_aaSubstitutions', '')
-    adjusted_orf1b_mutations = adjust_mutations_list(';'.join(split_mutations(orf1b_raw)), 9)
+    orf1b_subs = split_and_clean(row.get('ORF1b_aaSubstitutions', ''))
+    orf1b_dels = split_and_clean(row.get('ORF1b_aaDeletions', ''), is_deletion=True)
+    orf1b_all  = orf1b_subs + orf1b_dels
+    adjusted_orf1b_mutations = [adjust_mutation_position(m, 9) for m in orf1b_all]
     rdrp_found = get_inhibitors_from_list(adjusted_orf1b_mutations, rdrp_df)
     
     # Get max fold changes
