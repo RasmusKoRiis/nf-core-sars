@@ -85,6 +85,8 @@ for _, r in main_df.iterrows():
         '3CLpro_Fold': a_fold if a_fold is not None else 'No Data',
     })
 
+    
+
 # ───────── write output ──────────────────────────────────────────────
 out_df = pd.DataFrame(rows)
 out_file = f'{run_id}_resistance_mutations.csv'
