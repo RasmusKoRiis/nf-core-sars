@@ -1,174 +1,92 @@
-import pandas as pd
-import sys
-import re
-import math
+#!/usr/bin/env python3
+"""
+Generate a resistance-mutation summary from a Nextclade CSV.
+Call:
+python resistance_check.py  <nextclade.csv>  <run_id>  <spike.csv>  <rdrp.csv>  <clpro.csv>
+"""
 
-csv = sys.argv[1]
-id = sys.argv[2]
-Spike = sys.argv[3]
-RdRp = sys.argv[4]
-CLpro = sys.argv[5]
+import sys, re, math, pandas as pd
+main_csv, run_id, spike_csv, rdrp_csv, clpro_csv = sys.argv[1:6]
 
+# ───────── helpers ───────────────────────────────────────────────────
+def normalise_del(m: str) -> str:          # 'L24-' → 'L24del'
+    return m[:-1] + 'del' if m.strip().endswith('-') else m.strip()
 
-# --- helper --------------
-def split_mutations(raw):
+def offset(m: str, d: int) -> str:         # add / subtract residue shift
+    mobj = re.fullmatch(r'([A-Z])(\d+)([A-Z]|del)', m)
+    if not mobj:
+        return m
+    aa_from, pos, aa_to = mobj.groups()
+    return f'{aa_from}{int(pos)+d}{aa_to}'
+
+def split_clean(raw: str, *, dels=False) -> list[str]:
     if pd.isna(raw) or raw.strip().lower() == 'no mutation':
         return []
-    return [m.strip() for m in re.split(r'[;,]', raw) if m.strip()]
+    bits = re.split(r'[;,]', raw)
+    return [normalise_del(b) if dels else b.strip()
+            for b in bits if b.strip()]
 
-def normalise_deletion(m):
-    """
-    Turn 'L24-' → 'L24del'  (handles any AA letter + position + '-')
-    Leaves substitutions untouched.
-    """
-    m = m.strip()
-    if m.endswith('-'):
-        return m[:-1] + 'del'
-    return m
+def max_fold(nc_muts, df, col):
+    vals = []
+    for m in nc_muts:
+        for v in df.loc[df['Nextclade_lookup'] == m, col]:
+            try:
+                vals.append(float(str(v).replace(',', '').replace('%', '')))
+            except (ValueError, TypeError):
+                pass
+    return max(vals) if vals else None
 
-import re
+def to_lookup(nc_muts, df):          # ➊ convert NC → internal for reporting
+    lst = df.loc[df['Nextclade_lookup'].isin(nc_muts), 'Mutation']
+    seen = set()
+    return [m for m in lst if not (m in seen or seen.add(m))]
 
-def split_and_clean(raw, *, is_deletion=False):
-    """
-    Split on ',' or ';', drop blanks / 'No mutation', strip whitespace,
-    optionally convert deletions to 'del' form.
-    """
-    if pd.isna(raw) or raw.strip().lower() == 'no mutation':
-        return []
-    parts = [p.strip() for p in re.split(r'[;,]', raw) if p.strip()]
-    if is_deletion:
-        parts = [normalise_deletion(p) for p in parts]
-    return parts
+# ───────── load look-up tables ───────────────────────────────────────
+clpro_df = pd.read_csv(clpro_csv)
+rdrp_df  = pd.read_csv(rdrp_csv)
+spike_df = pd.read_csv(spike_csv)
 
-
-# Function to adjust mutation positions
-def adjust_mutation_position(mutation_str, offset):
-    match = re.match(r'^([A-Z])(\d+)([A-Z]|del)$', mutation_str)
-    if match:
-        aa_from, position, aa_to = match.groups()
-        new_position = int(position) + offset
-        return f"{aa_from}{new_position}{aa_to}"
-    else:
-        return mutation_str
-
-def adjust_mutations_list(mutations_str, offset):
-    if pd.isna(mutations_str) or mutations_str == 'No mutation':
-        return []
-    mutations = [m.strip() for m in mutations_str.split(',') if m.strip()]
-    adjusted_mutations = []
-    for m in mutations:
-        adjusted_m = adjust_mutation_position(m, offset)
-        adjusted_mutations.append(adjusted_m)
-    return adjusted_mutations
-
-def get_inhibitors_from_list(mutations_list, lookup_df):
-    found_mutations = []
-    for m in mutations_list:
-        if m in lookup_df['Nextclade_lookup'].values:
-            found_mutations.append(m)
-    return found_mutations
-
-def get_max_fold_change(mutations_list, lookup_df, fold_column):
-    fold_changes = []
-    for m in mutations_list:
-        df_match = lookup_df[lookup_df['Nextclade_lookup'] == m]
-        if not df_match.empty:
-            fold_values = df_match[fold_column].values
-            for fold_value in fold_values:
-                fold_value_str = str(fold_value).replace(",", "").replace("%", "").strip()
-                try:
-                    fold_value = float(fold_value_str)
-                    fold_changes.append(fold_value)
-                except (ValueError, TypeError):
-                    fold_changes.append(0)
-                    pass
-    
-    fold_changes_filtered = [fc for fc in fold_changes if not math.isnan(fc)]
-    
-    if fold_changes_filtered:
-        return max(fold_changes_filtered)
-    else:
-        return None
-
-# Read main.csv
-main_df = pd.read_csv(csv)
-
-# Read lookup CSVs
-clpro_df = pd.read_csv(CLpro)
-rdrp_df = pd.read_csv(RdRp)
-spike_df = pd.read_csv(Spike)
-
-# Process lookup DataFrames
-clpro_df['Nextclade_lookup'] = clpro_df['Mutation'].apply(lambda x: adjust_mutation_position(x, 3263))
-rdrp_df['Nextclade_lookup'] = rdrp_df['Mutation'].apply(lambda x: adjust_mutation_position(x, 9))
+clpro_df['Nextclade_lookup'] = clpro_df['Mutation'].apply(
+    lambda m: offset(normalise_del(m),  3263))   # nsp5 +3263
+rdrp_df ['Nextclade_lookup'] = rdrp_df ['Mutation'].apply(
+    lambda m: offset(normalise_del(m),   -9))    # nsp12 −9
 spike_df['Nextclade_lookup'] = spike_df['Mutation']
 
-# Initialize lists to store results
-samples = []
-spike_inhibitors = []
-rdrp_inhibitors = []
-clpro_inhibitors = []
-spike_folds = []
-rdrp_folds = []
-clpro_folds = []
+# ───────── iterate samples ───────────────────────────────────────────
+main_df = pd.read_csv(main_csv)
+rows = []
 
-for idx, row in main_df.iterrows():
-    sample = row['Sample']
-    s_mutations = row.get('S_aaSubstitutions', '')
-    orf1a_mutations = row.get('ORF1a_aaSubstitutions', '')
-    orf1b_mutations = row.get('ORF1b_aaSubstitutions', '')
-    
-    # For Spike mutations
-    s_subs  = split_and_clean(row.get('S_aaSubstitutions', ''))
-    s_dels  = split_and_clean(row.get('S_aaDeletions', ''), is_deletion=True)
-    s_mutations_list = s_subs + s_dels
-    spike_found = get_inhibitors_from_list(s_mutations_list, spike_df)
-    
-    # For ORF1a mutations (3CLpro)
-    orf1a_subs = split_and_clean(row.get('ORF1a_aaSubstitutions', ''))
-    orf1a_dels = split_and_clean(row.get('ORF1a_aaDeletions', ''), is_deletion=True)
-    orf1a_all  = orf1a_subs + orf1a_dels
-    adjusted_orf1a_mutations = [adjust_mutation_position(m, 3263) for m in orf1a_all]
-    clpro_found = get_inhibitors_from_list(adjusted_orf1a_mutations, clpro_df)
-    
-    # For ORF1b mutations (RdRp)
-    orf1b_subs = split_and_clean(row.get('ORF1b_aaSubstitutions', ''))
-    orf1b_dels = split_and_clean(row.get('ORF1b_aaDeletions', ''), is_deletion=True)
-    orf1b_all  = orf1b_subs + orf1b_dels
-    adjusted_orf1b_mutations = [adjust_mutation_position(m, 9) for m in orf1b_all]
-    rdrp_found = get_inhibitors_from_list(adjusted_orf1b_mutations, rdrp_df)
-    
-    # Get max fold changes
-    spike_max_fold = get_max_fold_change(spike_found, spike_df, 'BAM: fold')
-    rdrp_max_fold = get_max_fold_change(rdrp_found, rdrp_df, 'RDV: fold')
-    clpro_max_fold = get_max_fold_change(clpro_found, clpro_df, 'NTV: fold')
-    
-    # If no inhibitors found, add "No Mutations" otherwise join the list
-    spike_inhibitors.append(','.join(spike_found) if spike_found else "No Mutations")
-    rdrp_inhibitors.append(','.join(rdrp_found) if rdrp_found else "No Mutations")
-    clpro_inhibitors.append(','.join(clpro_found) if clpro_found else "No Mutations")
-    
-    # If no fold changes, add "No Data"
-    spike_folds.append(spike_max_fold if spike_max_fold is not None else "No Data")
-    rdrp_folds.append(rdrp_max_fold if rdrp_max_fold is not None else "No Data")
-    clpro_folds.append(clpro_max_fold if clpro_max_fold is not None else "No Data")
-    
-    samples.append(sample)
+for _, r in main_df.iterrows():
+    # SPIKE
+    s_nc   = split_clean(r['S_aaSubstitutions']) + \
+             split_clean(r.get('S_aaDeletions', ''), dels=True)
+    s_disp = to_lookup(s_nc, spike_df)            # ➊ display list
+    s_fold = max_fold(s_nc, spike_df, 'BAM: fold')
 
-# Create output DataFrame
-output_df = pd.DataFrame({
-    'Sample': samples,
-    'Spike_mAbs_inhibitors': spike_inhibitors,
-    'Spike_Fold': spike_folds,
-    'RdRp_inhibitors': rdrp_inhibitors,
-    'RdRp_Fold': rdrp_folds,
-    '3CLpro_inhibitors': clpro_inhibitors,
-    '3CLpro_Fold': clpro_folds
-})
+    # 3CLpro
+    a_nc   = split_clean(r['ORF1a_aaSubstitutions']) + \
+             split_clean(r.get('ORF1a_aaDeletions', ''), dels=True)
+    a_disp = to_lookup(a_nc, clpro_df)            # ➊
+    a_fold = max_fold(a_nc, clpro_df, 'NTV: fold')
 
-# Write to CSV
-resitance_csv__name = id + '_' + "resistance_mutations.csv"
-output_df.fillna("No Mutations", inplace=True)
-output_df.to_csv(resitance_csv__name, index=False)
+    # RdRp
+    b_nc   = split_clean(r['ORF1b_aaSubstitutions']) + \
+             split_clean(r.get('ORF1b_aaDeletions', ''), dels=True)
+    b_disp = to_lookup(b_nc, rdrp_df)             # ➊
+    b_fold = max_fold(b_nc, rdrp_df, 'RDV: fold')
 
-print(f"Processing complete. Results saved to '{resitance_csv__name}'.")
+    rows.append({
+        'Sample': r['Sample'],
+        'Spike_mAbs_inhibitors': ",".join(s_disp) if s_disp else 'No Mutations',
+        'Spike_Fold':  s_fold if s_fold is not None else 'No Data',
+        'RdRp_inhibitors': ",".join(b_disp) if b_disp else 'No Mutations',
+        'RdRp_Fold':   b_fold if b_fold is not None else 'No Data',
+        '3CLpro_inhibitors': ",".join(a_disp) if a_disp else 'No Mutations',
+        '3CLpro_Fold': a_fold if a_fold is not None else 'No Data',
+    })
+
+# ───────── write output ──────────────────────────────────────────────
+out_df = pd.DataFrame(rows)
+out_file = f'{run_id}_resistance_mutations.csv'
+out_df.to_csv(out_file, index=False)
+print(f'✔ Results written to {out_file}')
