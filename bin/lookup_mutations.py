@@ -6,6 +6,8 @@ python resistance_check.py  <nextclade.csv>  <run_id>  <spike.csv>  <rdrp.csv>  
 """
 
 import sys, re, math, pandas as pd
+from typing import Optional, List, Dict
+
 main_csv, run_id, spike_csv, rdrp_csv, clpro_csv = sys.argv[1:6]
 
 # ───────── helpers ───────────────────────────────────────────────────
@@ -19,7 +21,7 @@ def offset(m: str, d: int) -> str:         # add / subtract residue shift
     aa_from, pos, aa_to = mobj.groups()
     return f'{aa_from}{int(pos)+d}{aa_to}'
 
-def split_clean(raw: str, *, dels=False) -> list[str]:
+def split_clean(raw: str, *, dels: bool = False) -> List[str]:
     if pd.isna(raw):
         return []
     s = str(raw).strip()
@@ -42,7 +44,7 @@ def max_fold(nc_muts, df, col):
 def to_lookup(nc_muts, df):          # convert NC → internal for reporting
     lst = df.loc[df['Nextclade_lookup'].isin(nc_muts), 'Mutation']
     seen = set()
-    out = []
+    out: List[str] = []
     for m in lst:
         if m not in seen:
             out.append(m)
@@ -50,7 +52,7 @@ def to_lookup(nc_muts, df):          # convert NC → internal for reporting
     return out
 
 # --- QC helpers ---
-def parse_percentish(x) -> float | None:
+def parse_percentish(x) -> Optional[float]:
     """Return percent 0–100, handling '96.4', '96.4%', '0.964'."""
     if pd.isna(x):
         return None
@@ -64,12 +66,12 @@ def parse_percentish(x) -> float | None:
     # If value looks like a fraction (<=1), treat as 0–1 → %
     return v * 100.0 if v <= 1.0 else v
 
-def parse_cds_coverage(s: str) -> dict:
+def parse_cds_coverage(s: str) -> Dict[str, float]:
     """
     Parse cdsCoverage like 'E:1,M:1,...,ORF1a:0.9343,ORF1b:1,S:1'
     Returns floats in 0–1; tolerates '%', or 0–100 values.
     """
-    out = {}
+    out: Dict[str, float] = {}
     if pd.isna(s):
         return out
     for part in re.split(r'[;,]\s*', str(s).strip()):
@@ -114,6 +116,11 @@ spike_df['Nextclade_lookup'] = spike_df['Mutation']
 
 # ───────── iterate samples ───────────────────────────────────────────
 main_df = pd.read_csv(main_csv)
+
+# small safety: if Nextclade CSV still has 'seqName'
+if 'Sample' not in main_df.columns and 'seqName' in main_df.columns:
+    main_df = main_df.rename(columns={'seqName': 'Sample'})
+
 rows = []
 
 for _, r in main_df.iterrows():
@@ -121,7 +128,7 @@ for _, r in main_df.iterrows():
 
     if mask:
         rows.append({
-            'Sample': r['Sample'],
+            'Sample': r.get('Sample', ''),
             'Spike_mAbs_inhibitors': 'NA',
             'Spike_Fold':  'NA',
             'RdRp_inhibitors': 'NA',
@@ -147,7 +154,7 @@ for _, r in main_df.iterrows():
     b_fold = max_fold(b_nc, rdrp_df, 'RDV: fold')
 
     rows.append({
-        'Sample': r['Sample'],
+        'Sample': r.get('Sample', ''),
         'Spike_mAbs_inhibitors': ",".join(s_disp) if s_disp else 'No Mutations',
         'Spike_Fold':  s_fold if s_fold is not None else 'No Data',
         'RdRp_inhibitors': ",".join(b_disp) if b_disp else 'No Mutations',
