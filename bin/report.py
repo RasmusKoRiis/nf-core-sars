@@ -212,6 +212,35 @@ for out_col, src_col in {
 }.items():
     rep[out_col] = rep[src_col].apply(classify_dr_from_inhibitors) if src_col in rep.columns else 'NA'
 
+
+# Columns that should never be blank in the final report
+NA_ALWAYS = {
+    'Spike_mAbs_inhibitors','Spike_Fold',
+    '3CLpro_inhibitors','3CLpro_Fold',
+    'RdRp_inhibitors','RdRp_Fold',
+    'DR_Res_Paxlovid','DR_Res_Remdesevir','DR_Res_mAbs',
+    'QC','coverage','cdsCoverage',
+    'PCR-PlatePosition','KonsCt','Barcode'
+}
+
+# Any gene aa* column (incl split _1.._4)
+GENE_AA_COL = re.compile(
+    r'^(?:S|ORF1a|ORF1b|E|M|N|ORF3a|ORF6|ORF7a|ORF7b|ORF8|ORF9b)_'
+    r'(?:aaSubstitutions|aaDeletions|aaInsertions)(?:_\d+)?$'
+)
+
+def blank_to_NA(x):
+    if x is None:
+        return 'NA'
+    if isinstance(x, float) and np.isnan(x):
+        return 'NA'
+    s = str(x).strip()
+    return 'NA' if s == '' else x
+
+for c in rep.columns:
+    if (c in NA_ALWAYS) or (isinstance(c, str) and GENE_AA_COL.match(c)):
+        rep[c] = rep[c].apply(blank_to_NA)
+
 # 5) Tidy columns: Sample first, keep literal "NA"
 cols = list(rep.columns)
 rep = rep[['Sample'] + [c for c in cols if c != 'Sample']]
