@@ -2,8 +2,8 @@
 import sys, glob, re
 import pandas as pd
 
-MIN_OVERALL = 80.0   # overall coverage threshold (%)
-MIN_GENE    = 80.0   # cds coverage threshold (%)
+MIN_OVERALL = 80.0  # %
+MIN_GENE    = 80.0  # %
 
 def clean_key(s):
     if pd.isna(s): return ""
@@ -13,7 +13,6 @@ def clean_key(s):
     return s.strip()
 
 def parse_percentish(x):
-    """Return percent 0–100 or None; handles '0.956', '95.6', '95.6%'."""
     if pd.isna(x): return None
     s = str(x).strip().replace('%','')
     if not s: return None
@@ -24,48 +23,32 @@ def parse_percentish(x):
     return v*100.0 if v <= 1.0 else v
 
 def parse_cds_coverage(s):
-    """cdsCoverage 'E:1;...;ORF1a:0.9;ORF1b:1;S:0.87' → dict floats 0..1"""
     out = {}
     if pd.isna(s): return out
     for part in re.split(r'[;,]\s*', str(s).strip()):
         if not part or ':' not in part: continue
         gene, val = part.split(':', 1)
-        gene = gene.strip()
-        val  = val.strip().replace('%','')
+        gene = gene.strip(); val = val.strip().replace('%','')
         try:
             v = float(val)
         except ValueError:
             continue
-        if v > 1.0: v = v/100.0
+        if v > 1.0: v /= 100.0
         out[gene] = v
     return out
 
-def classify_dr_from_inhibitors(val: object) -> str:
-    """Return NA if not analyzed, ANNI if 'No Mutations', else Review."""
-    if pd.isna(val):           return 'NA'
+def classify_dr_from_inhibitors(val):
+    # NA (not analyzed) if inhibitors field is NA/blank
+    if pd.isna(val): return 'NA'
     s = str(val).strip()
-    if s == '' or s.upper() == 'NA':  # not analyzed → NA
-        return 'NA'
-    if 'no mutation' in s.lower():
-        return 'ANNI'
-    return 'Review'
+    if s == '' or s.upper() == 'NA': return 'NA'
+    return 'ANNI' if 'no mutation' in s.lower() else 'Review'
 
 def gene_cols_present(df, gene):
-    """All Nextclade aa* columns for a gene (incl. split _1.._4 if present)."""
-    cols = []
     patt = re.compile(fr'^{gene}_(aaSubstitutions|aaDeletions|aaInsertions)(?:_\d+)?$')
-    for c in df.columns:
-        if isinstance(c, str) and patt.fullmatch(c):
-            cols.append(c)
-    return cols
+    return [c for c in df.columns if isinstance(c,str) and patt.fullmatch(c)]
 
-if len(sys.argv) < 1:
-    sys.exit(f"Usage: {sys.argv[0]} <samplesheet.tsv|csv>")
-
-# Allow no samplesheet (some runs may not have it); if provided, merge it later
-samplesheet_path = sys.argv[1] if len(sys.argv) > 1 else None
-
-# 1) Load ALL per-sample resistance CSVs and CONCAT VERTICALLY
+# ---- load per-sample resistance CSVs and stack vertically ----
 res_paths = sorted(glob.glob("*_resistance_mutations.csv"))
 if not res_paths:
     sys.exit("[report] No *_resistance_mutations.csv files found.")
@@ -83,115 +66,88 @@ for p in res_paths:
         print(f"[report] skip {p}: {e}", file=sys.stderr)
 
 if not frames:
-    sys.exit("[report] No CSVs with a 'Sample' column after loading.")
+    sys.exit("[report] No usable CSVs with a 'Sample' column.")
 
 rep = pd.concat(frames, axis=0, ignore_index=True)
 rep = rep.drop_duplicates(subset=['Sample']).copy()
 rep['Sample'] = rep['Sample'].map(clean_key)
 
-# Helper: per-row coverage indicators
+# discover all gene symbols present (for masking aa* fields)
+all_genes = set()
+for c in rep.columns:
+    m = re.match(r'^([A-Za-z0-9]+)_(aaSubstitutions|aaDeletions|aaInsertions)', str(c))
+    if m: all_genes.add(m.group(1))
+
+# compute coverage helpers per row
 def row_overall_pct(row):
-    # Prefer 'QC_overall_pct' if present; else parse 'coverage'
-    if 'QC_overall_pct' in row and row['QC_overall_pct'] not in ('', None):
-        try:
-            return float(row['QC_overall_pct'])
-        except Exception:
-            pass
+    if 'QC_overall_pct' in row and str(row['QC_overall_pct']).strip() not in ('', 'NA'):
+        try: return float(row['QC_overall_pct'])
+        except: pass
     return parse_percentish(row.get('coverage'))
 
 def row_cds_map(row):
-    # Prefer QC_cds_* fields if present; else parse cdsCoverage blob
-    m = {}
-    cds_blob = row.get('cdsCoverage')
-    m = parse_cds_coverage(cds_blob)
-    # overwrite with explicit QC columns if they exist
+    m = parse_cds_coverage(row.get('cdsCoverage'))
     for g, col in [('S','QC_cds_S'), ('ORF1a','QC_cds_ORF1a'), ('ORF1b','QC_cds_ORF1b')]:
-        v = row.get(col)
-        try:
-            if v != '' and v is not None:
-                m[g] = float(v)  # these are 0..1
-        except Exception:
-            pass
+        if col in row and str(row[col]).strip() not in ('', 'NA'):
+            try: m[g] = float(row[col])  # 0..1
+            except: pass
     return m
 
-# 2) Apply masking policy (80/80)
-all_genes = set()
-# Discover all genes present in the table (for masking their aa* columns)
-for c in rep.columns:
-    m = re.match(r'^([A-Za-z0-9]+)_(aaSubstitutions|aaDeletions|aaInsertions)', str(c))
-    if m:
-        all_genes.add(m.group(1))
+rep['_overall_pct'] = rep.apply(row_overall_pct, axis=1)
+rep['_cds_map']     = rep.apply(row_cds_map, axis=1)
 
-# Compute coverage flags
-overall_list = []
-cds_maps = []
-for _, row in rep.iterrows():
-    overall_list.append(row_overall_pct(row))
-    cds_maps.append(row_cds_map(row))
-
-rep['_overall_pct'] = overall_list  # percent or None
-rep['_cds_map']     = cds_maps      # dict of 0..1
-
-# Mask per-row
+# ---- apply 80/80 masking policy ----
 for idx, row in rep.iterrows():
-    overall_pct = row['_overall_pct']  # None or %
+    overall_pct = row['_overall_pct']
     cds_map = row['_cds_map'] or {}
-
     overall_fail = (overall_pct is None) or (overall_pct < MIN_OVERALL)
 
-    # If sample failed Nextclade / overall <80 → mark NOT ANALYZED
     if overall_fail:
-        # Mask ALL gene aa* columns
+        # mask all Nextclade aa* and resistance outputs
         for gene in all_genes:
             for col in gene_cols_present(rep, gene):
                 rep.at[idx, col] = 'NA'
-        # Mask resistance outputs and ensure DR flags later become NA
         for col in ['Spike_mAbs_inhibitors','Spike_Fold',
                     '3CLpro_inhibitors','3CLpro_Fold',
                     'RdRp_inhibitors','RdRp_Fold']:
-            if col in rep.columns:
-                rep.at[idx, col] = 'NA'
-        # You may also want to set a clear QC label
-        if 'QC' in rep.columns and (not str(rep.at[idx,'QC']).strip()):
-            rep.at[idx, 'QC'] = 'masked: overall <80 or Nextclade failed'
-        continue  # no per-gene masking needed; already NA’d everything
+            if col in rep.columns: rep.at[idx, col] = 'NA'
+        if 'QC' in rep.columns:
+            q = str(rep.at[idx,'QC']).strip()
+            if not q: rep.at[idx,'QC'] = 'masked: overall <80 or Nextclade failed'
+        continue
 
-    # Else: per-gene cds masking (<80% → NA for that gene)
-    for gene, thresh in [('S', MIN_GENE), ('ORF1a', MIN_GENE), ('ORF1b', MIN_GENE)]:
-        v = cds_map.get(gene)  # 0..1 or None
-        gene_fail = (v is None) or (v < (thresh/100.0))
+    # per-gene cds <80 → NA for that gene
+    for gene, trio in [('S',      ['Spike_mAbs_inhibitors','Spike_Fold']),
+                       ('ORF1a',  ['3CLpro_inhibitors','3CLpro_Fold']),
+                       ('ORF1b',  ['RdRp_inhibitors','RdRp_Fold'])]:
+        v = cds_map.get(gene)
+        gene_fail = (v is None) or (v < (MIN_GENE/100.0))
         if gene_fail:
-            # Mask gene's aa* columns
             for col in gene_cols_present(rep, gene):
                 rep.at[idx, col] = 'NA'
-            # Mask resistance outputs for that target
-            if gene == 'S':
-                for col in ['Spike_mAbs_inhibitors','Spike_Fold']:
-                    if col in rep.columns: rep.at[idx, col] = 'NA'
-            elif gene == 'ORF1a':
-                for col in ['3CLpro_inhibitors','3CLpro_Fold']:
-                    if col in rep.columns: rep.at[idx, col] = 'NA'
-            elif gene == 'ORF1b':
-                for col in ['RdRp_inhibitors','RdRp_Fold']:
-                    if col in rep.columns: rep.at[idx, col] = 'NA'
-            # Set QC hint
+            for col in trio:
+                if col in rep.columns: rep.at[idx, col] = 'NA'
             if 'QC' in rep.columns:
                 q = str(rep.at[idx,'QC']).strip()
                 add = f"low {gene} cds"
                 rep.at[idx,'QC'] = add if not q else (q if add in q else f"{q}; {add}")
 
-# 3) Merge samplesheet (optional)
+# ---- merge samplesheet (CSV or TSV or whitespace-delimited) ----
 if len(sys.argv) > 1 and sys.argv[1]:
-    samplesheet_path = sys.argv[1]
-    # detect delimiter
-    delim = '\t'
+    ss_path = sys.argv[1]
+    sep = '\t'
     try:
-        head = open(samplesheet_path, 'r', encoding='utf-8', errors='ignore').read(4096)
-        if '\t' not in head: delim = ','
+        head = open(ss_path,'r',encoding='utf-8',errors='ignore').read(4096)
+        if '\t' in head:
+            sep = '\t'
+        elif ',' in head:
+            sep = ','
+        else:
+            sep = r'\s+'  # fallback: any whitespace (handles accidental spaces)
     except Exception:
-        pass
+        sep = '\t'
     try:
-        ss = pd.read_csv(samplesheet_path, sep=delim, keep_default_na=False)
+        ss = pd.read_csv(ss_path, sep=sep, engine=('python' if sep==r'\s+' else 'c'), keep_default_na=False)
         if 'SequenceID' in ss.columns and 'Sample' not in ss.columns:
             ss = ss.rename(columns={'SequenceID':'Sample'})
         if 'Sample' in ss.columns:
@@ -200,11 +156,11 @@ if len(sys.argv) > 1 and sys.argv[1]:
             keep = [c for c in ['Sample','PCR-PlatePosition','KonsCt','Barcode'] if c in ss.columns]
             if len(keep) > 1:
                 rep = rep.merge(ss[keep], on='Sample', how='left', validate='one_to_one')
-                print(f"[report] merged samplesheet {samplesheet_path} sep='{delim}'", file=sys.stderr)
+                print(f"[report] merged samplesheet {ss_path} sep='{sep}'", file=sys.stderr)
     except Exception as e:
         print(f"[report] samplesheet skipped: {e}", file=sys.stderr)
 
-# 4) DR flags — return NA when inhibitors are NA (not analyzed)
+# ---- DR flags (NA when not analyzed) ----
 for out_col, src_col in {
     'DR_Res_Paxlovid':   '3CLpro_inhibitors',
     'DR_Res_Remdesevir': 'RdRp_inhibitors',
@@ -212,8 +168,7 @@ for out_col, src_col in {
 }.items():
     rep[out_col] = rep[src_col].apply(classify_dr_from_inhibitors) if src_col in rep.columns else 'NA'
 
-
-# Columns that should never be blank in the final report
+# ---- normalize blanks to "NA" in key fields (no NumPy) ----
 NA_ALWAYS = {
     'Spike_mAbs_inhibitors','Spike_Fold',
     '3CLpro_inhibitors','3CLpro_Fold',
@@ -222,28 +177,21 @@ NA_ALWAYS = {
     'QC','coverage','cdsCoverage',
     'PCR-PlatePosition','KonsCt','Barcode'
 }
-
-# Any gene aa* column (incl split _1.._4)
 GENE_AA_COL = re.compile(
     r'^(?:S|ORF1a|ORF1b|E|M|N|ORF3a|ORF6|ORF7a|ORF7b|ORF8|ORF9b)_'
     r'(?:aaSubstitutions|aaDeletions|aaInsertions)(?:_\d+)?$'
 )
-
 def blank_to_NA(x):
-    if x is None:
-        return 'NA'
-    if isinstance(x, float) and np.isnan(x):
-        return 'NA'
+    if x is None or pd.isna(x): return 'NA'
     s = str(x).strip()
     return 'NA' if s == '' else x
 
 for c in rep.columns:
-    if (c in NA_ALWAYS) or (isinstance(c, str) and GENE_AA_COL.match(c)):
+    if (c in NA_ALWAYS) or (isinstance(c,str) and GENE_AA_COL.match(c)):
         rep[c] = rep[c].apply(blank_to_NA)
 
-# 5) Tidy columns: Sample first, keep literal "NA"
+# ---- write ----
 cols = list(rep.columns)
 rep = rep[['Sample'] + [c for c in cols if c != 'Sample']]
-
 rep.to_csv("merged_report.csv", index=False)
 print("[report] wrote merged_report.csv", file=sys.stderr)
