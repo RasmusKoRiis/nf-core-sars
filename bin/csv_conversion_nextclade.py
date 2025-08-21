@@ -7,7 +7,7 @@ run_id = sys.argv[2]
 # ---- Config ----
 GENE_COV_MIN = 0.80  # threshold for per-gene cdsCoverage
 
-# ---- Load & normalize empties to NA (hou2 sik1: good habit) ----
+# ---- Load & normalize empties to NA ----
 df = pd.read_csv(in_csv, sep=';')
 df = df.replace(r'^\s*$', pd.NA, regex=True)
 
