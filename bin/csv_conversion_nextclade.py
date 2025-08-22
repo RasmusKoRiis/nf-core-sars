@@ -65,11 +65,11 @@ def extract_mutations_by_gene(row: pd.Series, field: str, gene: str):
 nextclade_stats = df[['seqName', 'clade', 'Nextclade_pango', 'partiallyAliased',
                       'clade_nextstrain', 'clade_who',
                       'qc.mixedSites.totalMixedSites', 'coverage',
-                      'qc.mixedSites.totalMixedSites', 'qc.overallStatus']].copy()
+                      'qc.mixedSites.totalMixedSites', 'qc.overallStatus','frameShifts']].copy()
 nextclade_stats.columns = ['Sample', 'clade', 'Nextclade_pango', 'partiallyAliased',
                            'clade_nextstrain', 'clade_who',
                            'qc.mixedSites.totalMixedSites', 'coverage',
-                           'NC_Genome_MixedSites', 'NC_Genome_QC']
+                           'NC_Genome_MixedSites', 'NC_Genome_QC', 'NC_Genome_frameShifts']
 
 # ---- Extract mutations subset (keep coverage fields present) ----
 nextclade_mutations = df[['seqName', 'aaSubstitutions', 'aaDeletions', 'aaInsertions',

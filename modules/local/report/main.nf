@@ -58,7 +58,10 @@ process REPORT {
     awk -v date="\$current_date" -v OFS=',' '{ if (NR == 1) { print \$0, "Date" } else { print \$0, date } }' ${runid}_temp3.csv > ${runid}_temp4.csv
 
     # Add Release Version column
-    awk -v version="${release_version}" -v OFS=',' '{ if (NR == 1) { print \$0, "Release Version" } else { print \$0, version } }' ${runid}_temp4.csv > ${runid}.csv
+    awk -v version="${release_version}" -v OFS=',' '{ if (NR == 1) { print \$0, "Release Version" } else { print \$0, version } }' ${runid}_temp4.csv > ${runid}_temp5.csv
+
+    # QC calculations
+    python /project-bin/report_QC_calculation.py ${runid}_temp5.csv -o ${runid}.csv
 
     # Make Multiple FASTA file for all samples
     cat ${fasta} > ${runid}.fasta
