@@ -16,10 +16,8 @@ def parse_percentish(x):
     if pd.isna(x): return None
     s = str(x).strip().replace('%','')
     if not s: return None
-    try:
-        v = float(s)
-    except ValueError:
-        return None
+    try: v = float(s)
+    except ValueError: return None
     return v*100.0 if v <= 1.0 else v
 
 def parse_cds_coverage(s):
@@ -29,16 +27,13 @@ def parse_cds_coverage(s):
         if not part or ':' not in part: continue
         gene, val = part.split(':', 1)
         gene = gene.strip(); val = val.strip().replace('%','')
-        try:
-            v = float(val)
-        except ValueError:
-            continue
+        try: v = float(val)
+        except ValueError: continue
         if v > 1.0: v /= 100.0
         out[gene] = v
     return out
 
 def classify_dr_from_inhibitors(val):
-    # NA (not analyzed) if inhibitors field is NA/blank
     if pd.isna(val): return 'NA'
     s = str(val).strip()
     if s == '' or s.upper() == 'NA': return 'NA'
@@ -48,104 +43,73 @@ def gene_cols_present(df, gene):
     patt = re.compile(fr'^{gene}_(aaSubstitutions|aaDeletions|aaInsertions)(?:_\d+)?$')
     return [c for c in df.columns if isinstance(c,str) and patt.fullmatch(c)]
 
-# ---- load per-sample resistance CSVs and stack vertically ----
-res_paths = sorted(glob.glob("*_resistance_mutations.csv"))
-if not res_paths:
+def read_and_stack(patterns):
+    """Read all CSVs matching any of the patterns; stack vertically by Sample."""
+    paths = []
+    for pat in patterns:
+        paths += glob.glob(pat)
+    paths = sorted(set(paths))
+    frames = []
+    for p in paths:
+        try:
+            df = pd.read_csv(p, keep_default_na=False)
+            if 'Sample' not in df.columns:
+                if 'seqName' in df.columns: df = df.rename(columns={'seqName':'Sample'})
+                elif 'SequenceID' in df.columns: df = df.rename(columns={'SequenceID':'Sample'})
+            if 'Sample' in df.columns:
+                df['Sample'] = df['Sample'].map(clean_key)
+                frames.append(df)
+        except Exception as e:
+            print(f"[report] skip {p}: {e}", file=sys.stderr)
+    if not frames:
+        return pd.DataFrame(columns=['Sample'])
+    out = pd.concat(frames, axis=0, ignore_index=True)
+    out = out.drop_duplicates(subset=['Sample'])
+    out['Sample'] = out['Sample'].map(clean_key)
+    return out
+
+def merge_with_suffix(left, right, suffix):
+    """Left-join keeping ALL right columns; colliding names from right get suffixed."""
+    if right.empty: return left
+    # Rename collisions except the join key
+    rename = {c: f"{c}{suffix}" for c in right.columns if c in left.columns and c != 'Sample'}
+    if rename:
+        right = right.rename(columns=rename)
+    return left.merge(right, on='Sample', how='left', validate='one_to_one')
+
+# ----------------- load inputs -----------------
+# 1) Resistance summaries (one row per sample, wide schema)
+res = read_and_stack(["*_resistance_mutations.csv"])
+if res.empty:
     sys.exit("[report] No *_resistance_mutations.csv files found.")
 
-frames = []
-for p in res_paths:
-    try:
-        df = pd.read_csv(p, keep_default_na=False)  # keep literal "NA"
-        if 'Sample' not in df.columns and 'seqName' in df.columns:
-            df = df.rename(columns={'seqName':'Sample'})
-        if 'Sample' in df.columns:
-            df['Sample'] = df['Sample'].map(clean_key)
-            frames.append(df)
-    except Exception as e:
-        print(f"[report] skip {p}: {e}", file=sys.stderr)
+# 2) Nextclade stats (you attached these; bring all their columns)
+stats = read_and_stack(["*_nextclade_stats.csv"])
 
-if not frames:
-    sys.exit("[report] No usable CSVs with a 'Sample' column.")
+# 3) Build union base of sample IDs (res ∪ stats ∪ samplesheet if present)
+all_samples = set(res['Sample'])
+if not stats.empty: all_samples |= set(stats['Sample'])
 
-rep = pd.concat(frames, axis=0, ignore_index=True)
-rep = rep.drop_duplicates(subset=['Sample']).copy()
-rep['Sample'] = rep['Sample'].map(clean_key)
+base = pd.DataFrame({'Sample': sorted(all_samples)})
 
-# discover all gene symbols present (for masking aa* fields)
-all_genes = set()
-for c in rep.columns:
-    m = re.match(r'^([A-Za-z0-9]+)_(aaSubstitutions|aaDeletions|aaInsertions)', str(c))
-    if m: all_genes.add(m.group(1))
+# 4) Merge in resistance first (it carries the gene aa* + inhibitors)
+rep = merge_with_suffix(base, res, suffix="")  # no suffix
 
-# compute coverage helpers per row
-def row_overall_pct(row):
-    if 'QC_overall_pct' in row and str(row['QC_overall_pct']).strip() not in ('', 'NA'):
-        try: return float(row['QC_overall_pct'])
-        except: pass
-    return parse_percentish(row.get('coverage'))
+# 5) Merge in stats, suffix any collisions with _stats so nothing gets dropped
+rep = merge_with_suffix(rep, stats, suffix="_stats")
 
-def row_cds_map(row):
-    m = parse_cds_coverage(row.get('cdsCoverage'))
-    for g, col in [('S','QC_cds_S'), ('ORF1a','QC_cds_ORF1a'), ('ORF1b','QC_cds_ORF1b')]:
-        if col in row and str(row[col]).strip() not in ('', 'NA'):
-            try: m[g] = float(row[col])  # 0..1
-            except: pass
-    return m
-
-rep['_overall_pct'] = rep.apply(row_overall_pct, axis=1)
-rep['_cds_map']     = rep.apply(row_cds_map, axis=1)
-
-# ---- apply 80/80 masking policy ----
-for idx, row in rep.iterrows():
-    overall_pct = row['_overall_pct']
-    cds_map = row['_cds_map'] or {}
-    overall_fail = (overall_pct is None) or (overall_pct < MIN_OVERALL)
-
-    if overall_fail:
-        # mask all Nextclade aa* and resistance outputs
-        for gene in all_genes:
-            for col in gene_cols_present(rep, gene):
-                rep.at[idx, col] = 'NA'
-        for col in ['Spike_mAbs_inhibitors','Spike_Fold',
-                    '3CLpro_inhibitors','3CLpro_Fold',
-                    'RdRp_inhibitors','RdRp_Fold']:
-            if col in rep.columns: rep.at[idx, col] = 'NA'
-        if 'QC' in rep.columns:
-            q = str(rep.at[idx,'QC']).strip()
-            if not q: rep.at[idx,'QC'] = 'masked: overall <80 or Nextclade failed'
-        continue
-
-    # per-gene cds <80 → NA for that gene
-    for gene, trio in [('S',      ['Spike_mAbs_inhibitors','Spike_Fold']),
-                       ('ORF1a',  ['3CLpro_inhibitors','3CLpro_Fold']),
-                       ('ORF1b',  ['RdRp_inhibitors','RdRp_Fold'])]:
-        v = cds_map.get(gene)
-        gene_fail = (v is None) or (v < (MIN_GENE/100.0))
-        if gene_fail:
-            for col in gene_cols_present(rep, gene):
-                rep.at[idx, col] = 'NA'
-            for col in trio:
-                if col in rep.columns: rep.at[idx, col] = 'NA'
-            if 'QC' in rep.columns:
-                q = str(rep.at[idx,'QC']).strip()
-                add = f"low {gene} cds"
-                rep.at[idx,'QC'] = add if not q else (q if add in q else f"{q}; {add}")
-
-# ---- merge samplesheet (CSV or TSV or whitespace-delimited) ----
+# 6) Optional samplesheet merge (supports TSV/CSV/whitespace)
 if len(sys.argv) > 1 and sys.argv[1]:
     ss_path = sys.argv[1]
+    # detect delimiter
     sep = '\t'
     try:
         head = open(ss_path,'r',encoding='utf-8',errors='ignore').read(4096)
-        if '\t' in head:
-            sep = '\t'
-        elif ',' in head:
-            sep = ','
-        else:
-            sep = r'\s+'  # fallback: any whitespace (handles accidental spaces)
+        if '\t' in head: sep = '\t'
+        elif ',' in head: sep = ','
+        else: sep = r'\s+'   # accidental spaces from bad sed → still works
     except Exception:
-        sep = '\t'
+        pass
     try:
         ss = pd.read_csv(ss_path, sep=sep, engine=('python' if sep==r'\s+' else 'c'), keep_default_na=False)
         if 'SequenceID' in ss.columns and 'Sample' not in ss.columns:
@@ -155,12 +119,80 @@ if len(sys.argv) > 1 and sys.argv[1]:
             ss = ss.drop_duplicates(subset=['Sample'])
             keep = [c for c in ['Sample','PCR-PlatePosition','KonsCt','Barcode'] if c in ss.columns]
             if len(keep) > 1:
-                rep = rep.merge(ss[keep], on='Sample', how='left', validate='one_to_one')
+                rep = merge_with_suffix(rep, ss[keep], suffix="_ss")
                 print(f"[report] merged samplesheet {ss_path} sep='{sep}'", file=sys.stderr)
     except Exception as e:
         print(f"[report] samplesheet skipped: {e}", file=sys.stderr)
 
-# ---- DR flags (NA when not analyzed) ----
+# ----------------- 80/80 masking policy -----------------
+# discover all gene symbols for masking aa* fields
+all_genes = set()
+for c in rep.columns:
+    m = re.match(r'^([A-Za-z0-9]+)_(aaSubstitutions|aaDeletions|aaInsertions)', str(c))
+    if m: all_genes.add(m.group(1))
+
+def row_overall_pct(row):
+    # prefer QC_overall_pct if present; else parse coverage (res or stats)
+    for k in ('QC_overall_pct', 'coverage', 'coverage_stats'):
+        if k in rep.columns:
+            val = row.get(k)
+            if str(val).strip() not in ('', 'NA'):
+                try: return float(val) if k=='QC_overall_pct' else parse_percentish(val)
+                except: pass
+    return None
+
+def row_cds_map(row):
+    # Prefer explicit QC_cds_* fields; else parse cdsCoverage (if present)
+    m = {}
+    if 'cdsCoverage' in rep.columns:
+        m = parse_cds_coverage(row.get('cdsCoverage'))
+    for g, col in [('S','QC_cds_S'), ('ORF1a','QC_cds_ORF1a'), ('ORF1b','QC_cds_ORF1b')]:
+        if col in rep.columns:
+            v = row.get(col)
+            if str(v).strip() not in ('', 'NA'):
+                try: m[g] = float(v)  # 0..1
+                except: pass
+    return m
+
+rep['_overall_pct'] = rep.apply(row_overall_pct, axis=1)
+rep['_cds_map']     = rep.apply(row_cds_map, axis=1)
+
+for idx, row in rep.iterrows():
+    overall_pct = row['_overall_pct']
+    cds_map = row['_cds_map'] or {}
+    overall_fail = (overall_pct is None) or (overall_pct < MIN_OVERALL)
+
+    if overall_fail:
+        # mask ALL Nextclade aa* and resistance outputs
+        for gene in all_genes:
+            for col in gene_cols_present(rep, gene):
+                rep.at[idx, col] = 'NA'
+        for col in ['Spike_mAbs_inhibitors','Spike_Fold',
+                    '3CLpro_inhibitors','3CLpro_Fold',
+                    'RdRp_inhibitors','RdRp_Fold']:
+            if col in rep.columns: rep.at[idx, col] = 'NA'
+        if 'QC' in rep.columns:
+            q = str(rep.at[idx,'QC']).strip() if not pd.isna(rep.at[idx,'QC']) else ''
+            if not q: rep.at[idx,'QC'] = 'masked: overall <80 or Nextclade failed'
+        continue
+
+    # Per-gene masking
+    for gene, outs in [('S',['Spike_mAbs_inhibitors','Spike_Fold']),
+                       ('ORF1a',['3CLpro_inhibitors','3CLpro_Fold']),
+                       ('ORF1b',['RdRp_inhibitors','RdRp_Fold'])]:
+        v = cds_map.get(gene)
+        gene_fail = (v is None) or (v < (MIN_GENE/100.0))
+        if gene_fail:
+            for col in gene_cols_present(rep, gene):
+                rep.at[idx, col] = 'NA'
+            for col in outs:
+                if col in rep.columns: rep.at[idx, col] = 'NA'
+            if 'QC' in rep.columns:
+                q = str(rep.at[idx,'QC']).strip() if not pd.isna(rep.at[idx,'QC']) else ''
+                add = f"low {gene} cds"
+                rep.at[idx,'QC'] = add if not q else (q if add in q else f"{q}; {add}")
+
+# ----------------- DR flags (NA when not analyzed) -----------------
 for out_col, src_col in {
     'DR_Res_Paxlovid':   '3CLpro_inhibitors',
     'DR_Res_Remdesevir': 'RdRp_inhibitors',
@@ -168,7 +200,7 @@ for out_col, src_col in {
 }.items():
     rep[out_col] = rep[src_col].apply(classify_dr_from_inhibitors) if src_col in rep.columns else 'NA'
 
-# ---- normalize blanks to "NA" in key fields (no NumPy) ----
+# ----------------- normalize blanks to "NA" in key fields -----------------
 NA_ALWAYS = {
     'Spike_mAbs_inhibitors','Spike_Fold',
     '3CLpro_inhibitors','3CLpro_Fold',
@@ -190,7 +222,7 @@ for c in rep.columns:
     if (c in NA_ALWAYS) or (isinstance(c,str) and GENE_AA_COL.match(c)):
         rep[c] = rep[c].apply(blank_to_NA)
 
-# ---- write ----
+# Write with Sample first
 cols = list(rep.columns)
 rep = rep[['Sample'] + [c for c in cols if c != 'Sample']]
 rep.to_csv("merged_report.csv", index=False)
