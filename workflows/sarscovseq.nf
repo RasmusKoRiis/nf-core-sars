@@ -108,8 +108,7 @@ workflow SARSCOVSEQ() {
     )
 
  /
-    // MODULE MEDAK CONSENSUS (minimap2 → medaka → bcftools)
-    //
+    // MODULE MEDAK CONSENSUS 
 
 
     def min_depth = params.min_depth
