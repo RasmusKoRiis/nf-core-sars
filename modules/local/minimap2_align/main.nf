@@ -1,7 +1,7 @@
 process MINIMAP2_ALIGN {
     tag { "${meta.id}" }
     publishDir "results/aln", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
     container 'biocontainers/minimap2:v2.24--h5bf99c6_1'
     cpus 4
