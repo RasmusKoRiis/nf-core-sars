@@ -22,6 +22,13 @@ include { TABLELOOKUP                 } from '../modules/local/tablelookup/main'
 include { REPORT                      } from '../modules/local/report/main'
 include { DEPTH_ANALYSIS              } from '../modules/local/depth_analysis/main'
 
+include { MINIMAP2_ALIGN              } from '../modules/local/minimap2_align/main'
+include { MAKE_DEPTH_MASK             } from '../modules/local/make_depth_mask/main'
+include { PRIMER_MASK                 } from '../modules/local/primer_mask/main'
+include { MK_MASK_NO_PRIMER           } from '../modules/local/mk_mask_no_primer/main'
+include { MEDAKA_VARIANT              } from '../modules/local/medaka_variant/main'
+include { BCFTOOLS_CONSENSUS          } from '../modules/local/bcgtools_consensus/main'
+
 
 
 
@@ -100,10 +107,59 @@ workflow SARSCOVSEQ() {
         CAT_FASTQ.out.reads
     )
 
+ /
+    // MODULE: CONSENSUS (minimap2 → medaka → bcftools)
+    //
+
+
+    def min_depth = params.min_depth
+    def mask_primer_ends   = params.mask_primer_ends
+    def medaka_model   = params.medaka_model
  
 
+    // Align
+    MINIMAP2_ALIGN (
+        CHOPPER.out.chopperfastq,
+        Channel.value(file(params.reference))
+    )
+
+    // Build low-depth mask
+    MAKE_DEPTH_MASK (
+        MINIMAP2_ALIGN.out,
+        min_depth
+    )
+
+    // Primer + lowcov mask
+    PRIMER_MASK (
+        MAKE_DEPTH_MASK.out,
+        Channel.value(file(params.primer_bed)),
+        mask_primer_ends
+    )
+
+    MK_MASK_NO_PRIMER (
+        MAKE_DEPTH_MASK.out,
+        mask_primer_ends
+    )
+
+    // Pick the right mask channel regardless of branch
+    def mask_union = params.mask_primer_ends ? PRIMER_MASK.out : MK_MASK_NO_PRIMER.out
+
+    // Medaka
+    MEDAKA_VARIANT (
+        MINIMAP2_ALIGN.out,
+        Channel.value(file(params.reference)),
+        medaka_model
+    )
+
+    // Consensus
+    BCFTOOLS_CONSENSUS (
+        MEDAKA_VARIANT.out,
+        Channel.value(file(params.reference)),
+        mask_union
+    )
+
     //
-    // MODULE: AMPLIGONE.
+    // MODULE: AMPLIGONE. SKIP IF MEDAKA KEEP IF IRMA
     //    
 
     AMPLIGONE (
@@ -128,7 +184,8 @@ workflow SARSCOVSEQ() {
     //
 
     DEPTH_ANALYSIS (
-        IRMA.out.bam
+        //IRMA.out.bam
+        MINIMAP2_ALIGN.out.map { it -> tuple(it[0], it[1]) }  // (meta, bam)
     )
 
 
@@ -138,7 +195,8 @@ workflow SARSCOVSEQ() {
     //
 
     NEXTCLADE (
-        IRMA.out.amended_consensus
+        //IRMA.out.amended_consensus
+        BCFTOOLS_CONSENSUS.out.map { meta, fasta, report -> fasta } // pass consensus FASTA
     )
 
     //
@@ -176,7 +234,8 @@ workflow SARSCOVSEQ() {
         seq_instrument,
         Channel.value(file(params.input)),
         primer,
-        IRMA.out.amended_consensus_report.collect()
+        //IRMA.out.amended_consensus_report.collect()
+        BCFTOOLS_CONSENSUS.out.map { meta, fasta, report -> report }.collect()
     )
 
 
