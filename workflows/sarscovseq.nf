@@ -108,7 +108,7 @@ workflow SARSCOVSEQ() {
     )
 
  /
-    // MODULE: CONSENSUS (minimap2 → medaka → bcftools)
+    // MODULE MEDAK CONSENSUS (minimap2 → medaka → bcftools)
     //
 
 
