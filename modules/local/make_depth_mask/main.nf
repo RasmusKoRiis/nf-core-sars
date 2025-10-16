@@ -2,13 +2,14 @@ process MAKE_DEPTH_MASK {
     tag { "${meta.id}" }
     publishDir "results/qc", mode: 'copy', overwrite: true
     errorStrategy 'ignore'
-    
+
     container 'biocontainers/samtools:v1.19--h50ea8bc_0'
     input:
     tuple val(meta), path(bam)
     val   min_depth
+
     output:
-    tuple val(meta), path("${meta.id}.lowcov.bed")
+    tuple val(meta), path("${meta.id}.lowcov.bed"), emit: depth_mask
 
     script:
     """

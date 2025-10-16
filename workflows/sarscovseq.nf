@@ -123,13 +123,13 @@ workflow SARSCOVSEQ() {
 
     // Build low-depth mask
     MAKE_DEPTH_MASK (
-        MINIMAP2_ALIGN.out,
+        MINIMAP2_ALIGN.out.minimap2,
         min_depth
     )
 
     // Primer + lowcov mask
     PRIMER_MASK (
-        MAKE_DEPTH_MASK.out,
+        MAKE_DEPTH_MASK.out.depth_mask,
         Channel.value(file(params.primer_bed)),
         mask_primer_ends
     )
@@ -140,18 +140,18 @@ workflow SARSCOVSEQ() {
     )
 
     // Pick the right mask channel regardless of branch
-    def mask_union = params.mask_primer_ends ? PRIMER_MASK.out : MK_MASK_NO_PRIMER.out
+    def mask_union = params.mask_primer_ends ? PRIMER_MASK.out.primer_mask : MK_MASK_NO_PRIMER.out.mk_mask
 
     // Medaka
     MEDAKA_VARIANT (
-        MINIMAP2_ALIGN.out,
+        MINIMAP2_ALIGN.out.minimap2,
         Channel.value(file(params.reference)),
         medaka_model
     )
 
     // Consensus
     BCFTOOLS_CONSENSUS (
-        MEDAKA_VARIANT.out,
+        MEDAKA_VARIANT.out.medaka_var,
         Channel.value(file(params.reference)),
         mask_union
     )

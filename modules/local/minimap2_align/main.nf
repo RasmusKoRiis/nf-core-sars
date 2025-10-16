@@ -9,8 +9,9 @@ process MINIMAP2_ALIGN {
     input:
     tuple val(meta), path(reads)     // reads = List[fastq.gz]
     path  reference
+
     output:
-    tuple val(meta), path("${meta.id}.bam") into ch_bam
+    tuple val(meta), path("${meta.id}.bam"), emit: minimap2
 
     script:
     """

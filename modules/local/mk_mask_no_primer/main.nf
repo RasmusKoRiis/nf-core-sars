@@ -7,8 +7,9 @@ process MK_MASK_NO_PRIMER {
     input:
     tuple val(meta), path(lowcov_bed)
     val  mask_primer_ends
+
     output:
-    tuple val(meta), path("${meta.id}.mask.bed")
+    tuple val(meta), path("${meta.id}.mask.bed"), emit: mk_mask
 
     when:
     !mask_primer_ends

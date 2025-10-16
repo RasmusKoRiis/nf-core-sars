@@ -8,8 +8,9 @@ process PRIMER_MASK {
     tuple val(meta), path(lowcov_bed)
     path primer_bed
     val  mask_primer_ends
+    
     output:
-    tuple val(meta), path("${meta.id}.mask.bed")
+    tuple val(meta), path("${meta.id}.mask.bed"). emit: primer_mask
 
     when:
     mask_primer_ends

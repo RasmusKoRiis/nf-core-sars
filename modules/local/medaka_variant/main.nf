@@ -11,8 +11,9 @@ process MEDAKA_VARIANT {
     tuple val(meta), path(bam)
     path  reference
     val   medaka_model
+
     output:
-    tuple val(meta), path("${meta.id}.vcf.gz")
+    tuple val(meta), path("${meta.id}.vcf.gz"), emit: medaka_var
 
     script:
     """
