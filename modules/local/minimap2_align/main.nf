@@ -3,7 +3,7 @@ process MINIMAP2_ALIGN {
     publishDir "results/aln", mode: 'copy', overwrite: true
     //errorStrategy 'ignore'
 
-    container 'biocontainers/minimap2:v2.24--h5bf99c6_1'
+    container 'quay.io/biocontainers/minimap2:2.28--h43eeafb_0'
     cpus 4
     memory '4 GB'
     input:
