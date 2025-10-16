@@ -10,7 +10,7 @@ process PRIMER_MASK {
     val  mask_primer_ends
     
     output:
-    tuple val(meta), path("${meta.id}.mask.bed"). emit: primer_mask
+    tuple val(meta), path("${meta.id}.mask.bed"), emit: primer_mask
 
     when:
     mask_primer_ends
