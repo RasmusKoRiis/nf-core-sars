@@ -27,7 +27,7 @@ include { MAKE_DEPTH_MASK             } from '../modules/local/make_depth_mask/m
 include { PRIMER_MASK                 } from '../modules/local/primer_mask/main'
 include { MK_MASK_NO_PRIMER           } from '../modules/local/mk_mask_no_primer/main'
 include { MEDAKA_VARIANT              } from '../modules/local/medaka_variant/main'
-include { BCFTOOLS_CONSENSUS          } from '../modules/local/bcgtools_consensus/main'
+include { BCFTOOLS_CONSENSUS          } from '../modules/local/bcftools_consensus/main'
 
 
 
