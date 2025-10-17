@@ -2,8 +2,8 @@
 process DEPTH_ANALYSIS {
     tag "$meta.id"
     label 'process_medium'
-    debug true
-    //errorStrategy 'ignore'
+    //debug true
+    errorStrategy 'ignore'
    
 
 
