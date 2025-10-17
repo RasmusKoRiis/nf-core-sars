@@ -9,7 +9,7 @@ process MAKE_DEPTH_MASK {
     val   min_depth
 
     output:
-    tuple val(meta), path("${meta.id}.lowcov.bed"), emit: depth_mask
+    tuple val(meta), path("${meta.id}.lowcov.bed"), emit: lowcov
 
     script:
     """
