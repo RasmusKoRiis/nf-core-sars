@@ -1,36 +1,32 @@
 process MEDAKA_VARIANT {
-    tag { "${meta.id}" }
-    publishDir "results/medaka", mode: 'copy', overwrite: true
-    //errorStrategy 'ignore'
+  tag { "${meta.id}" }
+  publishDir "results/medaka", mode: 'copy', overwrite: true
+  container 'community.wave.seqera.io/library/medaka:2.1.1--01dc988f451b713d'
+  cpus 4
+  memory '6 GB'
 
-    container 'community.wave.seqera.io/library/medaka:2.1.1--01dc988f451b713d'
-    cpus 4
-    memory '6 GB'
+  input:
+  tuple val(meta), path(bam)
+  path  reference
+  val   medaka_model
 
-    input:
-    tuple val(meta), path(bam)
-    path  reference
-    val   medaka_model
+  output:
+  tuple val(meta), path("${meta.id}.vcf.gz"), emit: medaka_var
 
-    output:
-    tuple val(meta), path("${meta.id}.vcf.gz"), emit: medaka_var
+  script:
+  """
+  # Convert BAM -> FASTQ (coordinate-sorted warning is fine for haploid calling)
+  samtools fastq ${bam} > ${meta.id}.tmp.fq
 
-    script:
-    """
-    # Medaka wants reads; use bam via bam2fq then realign inside medaka_consensus? 
-    # Simpler path: medaka_variant supports BAM with --regions whole reference via pileup
-    # We'll extract FASTQ to be model-safe (small cost).
-    samtools fastq ${bam} > ${meta.id}.tmp.fq
+  medaka_variant \
+    -i ${meta.id}.tmp.fq \
+    -r ${reference} \            # <-- was -f
+    -o medaka_${meta.id} \
+    -m ${medaka_model} \
+    -t ${task.cpus}
 
-    medaka_variant \
-      -i ${meta.id}.tmp.fq \
-      -f ${reference} \
-      -o medaka_${meta.id} \
-      -m ${medaka_model} \
-      -t ${task.cpus}
-
-    bgzip -c medaka_${meta.id}/round_*/variants.vcf > ${meta.id}.vcf.gz
-    tabix -p vcf ${meta.id}.vcf.gz
-    rm -f ${meta.id}.tmp.fq
-    """
+  bgzip -c medaka_${meta.id}/round_*/variants.vcf > ${meta.id}.vcf.gz
+  tabix -p vcf ${meta.id}.vcf.gz
+  rm -f ${meta.id}.tmp.fq
+  """
 }
