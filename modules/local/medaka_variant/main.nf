@@ -10,8 +10,11 @@ process MEDAKA_VARIANT {
   path  reference
   val   medaka_model   // e.g. r1041_e82_400bps_hac_variant_v4.2.0
 
-  output:
-  tuple val(meta), path("${meta.id}.vcf.gz"), emit: medaka_var
+ output:
+  tuple val(meta),
+        path("${meta.id}.vcf.gz"),
+        path("${meta.id}.vcf.gz.tbi"),
+        emit: medaka_var
 
   script:
   """
@@ -27,6 +30,7 @@ process MEDAKA_VARIANT {
 
   bgzip -c medaka_${meta.id}/medaka.annotated.vcf > ${meta.id}.vcf.gz
   tabix -p vcf ${meta.id}.vcf.gz
+
   rm -f ${meta.id}.tmp.fq
   """
 }
