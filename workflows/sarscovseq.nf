@@ -70,6 +70,11 @@ def parseSampleSheet(sampleSheetPath) {
         .filter { it != null } // Remove null entries (samples with no FASTQ files)
 }
 
+// --- DEBUG PARAMS ---
+println "[DEBUG] params.reference = ${params.reference}"
+println "[DEBUG] params.primer_bed = ${params.primer_bed}"
+println "[DEBUG] params.mask_primer_ends = ${params.mask_primer_ends}"
+
 
 workflow SARSCOVSEQ() {
 
@@ -121,8 +126,17 @@ workflow SARSCOVSEQ() {
         Channel.value(file(params.reference))
     )
 
+
+    MINIMAP2_ALIGN.out.minimap2.view { it -> 
+    def m=it[0]; "[DBG ALIGN] id=${m.id} bam=${it[1]} bai=${it[2]}" 
+    }
+
     // 1) Depth mask
     MAKE_DEPTH_MASK( MINIMAP2_ALIGN.out.minimap2, params.min_depth )
+
+    MAKE_DEPTH_MASK.out.lowcov.view { it ->
+    def m=it[0]; "[DBG LOWCOV] id=${m.id} bed=${it[1]}"
+    }
 
     // 2) Primer mask branches
     PRIMER_MASK(
@@ -130,11 +144,30 @@ workflow SARSCOVSEQ() {
     Channel.value(file(params.primer_bed)),
     params.mask_primer_ends
     )
+
+
     MK_MASK_NO_PRIMER(
     MAKE_DEPTH_MASK.out.lowcov,
     params.mask_primer_ends
     )
+
+    PRIMER_MASK.out.primer_mask.view { it ->
+    def m=it[0]; "[DBG PRIMER_MASK] id=${m.id} bed=${it[1]}"
+    }
+    MK_MASK_NO_PRIMER.out.no_primer_mask.view { it ->
+    def m=it[0]; "[DBG NO_PRIMER_MASK] id=${m.id} bed=${it[1]}"
+    }
+
+
     def ch_mask = params.mask_primer_ends ? PRIMER_MASK.out.primer_mask : MK_MASK_NO_PRIMER.out.no_primer_mask
+
+    // Ensure mask channel never carries a null path
+    def ch_mask_checked = ch_mask.map { meta, bed ->
+    if (bed == null) error "[DBG ERROR] mask_bed is NULL for sample ${meta.id}"
+    tuple(meta, bed)
+    }.view { it ->
+    def m=it[0]; "[DBG MASK PICKED] id=${m.id} bed=${it[1]}"
+    }
 
     // 3) Medaka variants
     MEDAKA_VARIANT(
@@ -143,25 +176,45 @@ workflow SARSCOVSEQ() {
     params.medaka_model
     )
 
-    // Tag → join → reshape
-    def ch_vcf_tagged  = MEDAKA_VARIANT.out.medaka_var.map { meta, vcf, tbi ->
-    tuple(meta.id, meta, vcf)                   // keep vcf only
-    }
-    def ch_mask_tagged = ch_mask.map { meta, bed ->
-    tuple(meta.id, meta, bed)
+    MEDAKA_VARIANT.out.medaka_var.view { it ->
+    def m=it[0]; "[DBG MEDAKA] id=${m.id} vcf=${it[1]} tbi=${it.size()>2 ? it[2] : 'NA'}"
     }
 
-    // Join on id, then build (meta, vcf, bed)
+    // Tag channels by id
+    def ch_vcf_tagged  = MEDAKA_VARIANT.out.medaka_var.map { meta, vcf, tbi ->
+    tuple(meta.id, meta, vcf)
+    }.view { j -> "[DBG VCF_TAGGED] id=${j[0]} vcf=${j[2]}" }
+
+    def ch_mask_tagged = ch_mask_checked.map { meta, bed ->
+    tuple(meta.id, meta, bed)
+    }.view { j -> "[DBG MSK_TAGGED] id=${j[0]} bed=${j[2]}" }
+
+    // Join + reshape to (meta, vcf, bed)
     def ch_consensus_in = ch_vcf_tagged.join(ch_mask_tagged).map { j ->
     // j = [ id, meta_v, vcf, id2, meta_m, bed ]
-    tuple(j[1], j[2], j[5])                     // (meta, vcf, bed)
+    if (j[2] == null) error "[DBG ERROR] VCF is NULL for id=${j[0]}"
+    if (j[5] == null) error "[DBG ERROR] MASK is NULL for id=${j[0]}"
+    tuple(j[1], j[2], j[5])
+    }.view { c ->
+    def m=c[0]; "[DBG CONS_IN] id=${m.id} vcf=${c[1]} bed=${c[2]}"
     }
 
-    // Call bcftools
+    // Show the reference we pass as a path input
+    Channel
+    .value(file(params.reference))
+    .view { ref -> "[DBG REF] ${ref} (exists=${file(ref).exists()})" }
+    .set { ch_ref_dbg }
+
     BCFTOOLS_CONSENSUS(
     ch_consensus_in,
-    Channel.value(file(params.reference))
+    ch_ref_dbg
     )
+
+    // Call bcftools
+    //BCFTOOLS_CONSENSUS(
+    //ch_consensus_in,
+    //Channel.value(file(params.reference))
+    //)
 
 
     //

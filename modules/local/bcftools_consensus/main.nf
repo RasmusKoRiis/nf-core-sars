@@ -5,7 +5,7 @@ process BCFTOOLS_CONSENSUS {
   container 'community.wave.seqera.io/library/bcftools:1.22--a51ee80717c2467e'
 
   input:
-    tuple val(meta), path(vcf), path(mask_bed)   // <- drop vcf_tbi
+    tuple val(meta), path(vcf), path(mask_bed)   
     path  reference
 
   output:
