@@ -214,13 +214,6 @@ workflow SARSCOVSEQ() {
     ch_ref_dbg
     )
 
-    // Call bcftools
-    //BCFTOOLS_CONSENSUS(
-    //ch_consensus_in,
-    //Channel.value(file(params.reference))
-    //)
-
-
     //
     // MODULE: AMPLIGONE. SKIP IF MEDAKA KEEP IF IRMA
     //    
@@ -244,8 +237,8 @@ workflow SARSCOVSEQ() {
     //
 
     DEPTH_ANALYSIS (
-        //IRMA.out.bam
-        MINIMAP2_ALIGN.out.minimap2
+        IRMA.out.bam
+        //MINIMAP2_ALIGN.out.minimap2
     )
 
 
@@ -254,8 +247,8 @@ workflow SARSCOVSEQ() {
     //
 
     NEXTCLADE (
-        //IRMA.out.amended_consensus
-        BCFTOOLS_CONSENSUS.out.bcft_consensus
+        IRMA.out.amended_consensus
+        //BCFTOOLS_CONSENSUS.out.bcft_consensus
     )
 
     //
@@ -293,8 +286,8 @@ workflow SARSCOVSEQ() {
         seq_instrument,
         Channel.value(file(params.input)),
         primer,
-        //IRMA.out.amended_consensus_report.collect()
-        BCFTOOLS_CONSENSUS.out.bcft_report_consensus.collect()
+        IRMA.out.amended_consensus_report.collect()
+        //BCFTOOLS_CONSENSUS.out.bcft_report_consensus.collect()
     )
 
 
