@@ -10,6 +10,7 @@ process BCFTOOLS_CONSENSUS {
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), path("${meta.id}.consensus.report.txt")
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: bcft_consensus
+    path("${meta.id}.consensus.fasta"), emit: bcft_consensus, emit: bcft_report_consensus
 
   script:
   """

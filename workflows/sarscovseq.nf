@@ -230,12 +230,9 @@ workflow SARSCOVSEQ() {
     )
 
 
-
-
     //
     // MODULE: IRMA
     //
-
 
     IRMA (
         AMPLIGONE.out.primertrimmedfastq
@@ -250,7 +247,6 @@ workflow SARSCOVSEQ() {
         //IRMA.out.bam
         MINIMAP2_ALIGN.out.minimap2
     )
-
 
 
     //
@@ -298,7 +294,7 @@ workflow SARSCOVSEQ() {
         Channel.value(file(params.input)),
         primer,
         //IRMA.out.amended_consensus_report.collect()
-        BCFTOOLS_CONSENSUS.out.bcft_consensus.collect()
+        BCFTOOLS_CONSENSUS.out.bcft_report_consensus.collect()
     )
 
 
