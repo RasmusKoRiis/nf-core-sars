@@ -124,7 +124,7 @@ workflow SARSCOVSEQ() {
     // Build low-depth mask
     MAKE_DEPTH_MASK ( MINIMAP2_ALIGN.out.minimap2, min_depth )
 
-    // Choose primer mask path or passthrough bed
+    // Primer masking
     PRIMER_MASK (
     MAKE_DEPTH_MASK.out.lowcov,
     Channel.value(file(params.primer_bed)),
@@ -143,15 +143,10 @@ workflow SARSCOVSEQ() {
     medaka_model
     )
 
-    // --- Join VCF and mask by sample id (critical) ---
-    def ch_vcf_tagged = MEDAKA_VARIANT.out.medaka_var.map { meta, vcf, tbi ->
-    tuple(meta.id, meta, vcf, tbi)
-    }
-    def ch_mask_tagged = ch_mask.map { meta, bed ->
-    tuple(meta.id, meta, bed)
-    }
+    // Join VCF + mask by sample id
+    def ch_vcf_tagged  = MEDAKA_VARIANT.out.medaka_var .map { meta, vcf, tbi -> tuple(meta.id, meta, vcf, tbi) }
+    def ch_mask_tagged = ch_mask                      .map { meta, bed       -> tuple(meta.id, meta, bed) }
 
-    // Join on id, then shape for bcftools
     def ch_consensus_in = ch_vcf_tagged.join(ch_mask_tagged).map { id, meta1, vcf, tbi, _id2, _meta2, bed ->
     tuple(meta1, vcf, tbi, bed)
     }
