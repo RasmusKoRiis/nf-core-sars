@@ -5,7 +5,7 @@ process MAKE_DEPTH_MASK {
 
     container 'community.wave.seqera.io/library/bedtools_samtools:2932e857ecf6b5f2'
     input:
-    tuple val(meta), path(bam)
+    tuple val(meta), path(bam), path(bai)
     val   min_depth
 
     output:

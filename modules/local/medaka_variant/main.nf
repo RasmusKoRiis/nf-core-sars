@@ -6,7 +6,7 @@ process MEDAKA_VARIANT {
   memory '6 GB'
 
   input:
-  tuple val(meta), path(bam)
+  tuple val(meta), path(bam), path(bai)
   path  reference
   val   medaka_model   // e.g. r1041_e82_400bps_hac_variant_v4.2.0
 
