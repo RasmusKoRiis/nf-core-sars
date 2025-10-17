@@ -1,9 +1,9 @@
 process MEDAKA_VARIANT {
     tag { "${meta.id}" }
     publishDir "results/medaka", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
-    container 'ontresearch/medaka:1.11.3'
+    container 'community.wave.seqera.io/library/pip_medaka:e86ef4ad6b9b868d'
     cpus 4
     memory '6 GB'
 

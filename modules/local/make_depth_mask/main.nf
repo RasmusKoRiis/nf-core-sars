@@ -3,7 +3,7 @@ process MAKE_DEPTH_MASK {
     publishDir "results/qc", mode: 'copy', overwrite: true
     errorStrategy 'ignore'
 
-    container 'biocontainers/samtools:v1.19--h50ea8bc_0'
+    container 'community.wave.seqera.io/library/pip_samtools_tool:1112661e1f5d0aae'
     input:
     tuple val(meta), path(bam)
     val   min_depth

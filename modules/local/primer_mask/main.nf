@@ -1,9 +1,9 @@
 process PRIMER_MASK {
     tag { "${meta.id}" }
     publishDir "results/qc", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
     
-    container 'quay.io/biocontainers/bedtools:2.31.0--hf5e1c6e_2'
+    container 'community.wave.seqera.io/library/pip_samtools_tool:1112661e1f5d0aae'
     input:
     tuple val(meta), path(lowcov_bed)
     path primer_bed

@@ -1,9 +1,9 @@
 process BCFTOOLS_CONSENSUS {
     tag { "${meta.id}" }
     publishDir "results/consensus", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
     
-    container 'biocontainers/bcftools:v1.19--h8b25389_0'
+    container 'community.wave.seqera.io/library/bcftools_htslib:0a3fa2654b52006f'
     input:
     tuple val(meta), path(vcf)
     path  reference

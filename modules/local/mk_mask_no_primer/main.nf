@@ -1,9 +1,9 @@
 process MK_MASK_NO_PRIMER {
     tag { "${meta.id}" }
     publishDir "results/qc", mode: 'copy', overwrite: true
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
     
-    container 'bash:5.2'
+    container 'community.wave.seqera.io/library/pip_samtools_tool:1112661e1f5d0aae'
     input:
     tuple val(meta), path(lowcov_bed)
     val  mask_primer_ends
