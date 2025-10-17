@@ -259,7 +259,7 @@ workflow SARSCOVSEQ() {
 
     NEXTCLADE (
         //IRMA.out.amended_consensus
-        BCFTOOLS_CONSENSUS.out.map { meta, fasta, report -> fasta } // pass consensus FASTA
+        BCFTOOLS_CONSENSUS.out.bcft_consensus
     )
 
     //

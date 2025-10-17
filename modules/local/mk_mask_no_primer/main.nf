@@ -10,7 +10,7 @@ process MK_MASK_NO_PRIMER {
     !mask_primer_ends
 
   output:
-    tuple val(meta), path("${meta.id}.mask.bed"), emit: no_primer_mask  // <-- name it
+    tuple val(meta), path("${meta.id}.mask.bed"), emit: no_primer_mask  
 
   container 'bash:5.2'
   script:
