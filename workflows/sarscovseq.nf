@@ -298,7 +298,7 @@ workflow SARSCOVSEQ() {
         Channel.value(file(params.input)),
         primer,
         //IRMA.out.amended_consensus_report.collect()
-        BCFTOOLS_CONSENSUS.out.map { meta, fasta, report -> report }.collect()
+        BCFTOOLS_CONSENSUS.out.bcft_consensus.collect()
     )
 
 
