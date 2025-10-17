@@ -189,12 +189,16 @@ workflow SARSCOVSEQ() {
     tuple(meta.id, meta, bed)
     }.view { j -> "[DBG MSK_TAGGED] id=${j[0]} bed=${j[2]}" }
 
-    // Join + reshape to (meta, vcf, bed)
-    def ch_consensus_in = ch_vcf_tagged.join(ch_mask_tagged).map { j ->
-    // j = [ id, meta_v, vcf, id2, meta_m, bed ]
+    // Join result shape (5 items):
+    // j[0]=id, j[1]=meta_left, j[2]=vcf, j[3]=meta_right, j[4]=bed
+    def ch_joined = ch_vcf_tagged.join(ch_mask_tagged).view { j ->
+    "[DBG JOIN] n=${j.size()} id=${j[0]} vcf=${j[2]} bed=${j[4]}"
+    }
+
+    def ch_consensus_in = ch_joined.map { j ->
     if (j[2] == null) error "[DBG ERROR] VCF is NULL for id=${j[0]}"
-    if (j[5] == null) error "[DBG ERROR] MASK is NULL for id=${j[0]}"
-    tuple(j[1], j[2], j[5])
+    if (j[4] == null) error "[DBG ERROR] MASK is NULL for id=${j[0]}"
+    tuple(j[1], j[2], j[4])   // (meta, vcf, bed)
     }.view { c ->
     def m=c[0]; "[DBG CONS_IN] id=${m.id} vcf=${c[1]} bed=${c[2]}"
     }
