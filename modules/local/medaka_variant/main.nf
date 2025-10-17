@@ -15,12 +15,12 @@ process MEDAKA_VARIANT {
 
   script:
   """
-  # Convert BAM -> FASTQ (coordinate-sorted warning is fine for haploid calling)
+  # Convert BAM -> FASTQ (OK for haploid calling)
   samtools fastq ${bam} > ${meta.id}.tmp.fq
 
   medaka_variant \
     -i ${meta.id}.tmp.fq \
-    -r ${reference} \            # <-- was -f
+    -r ${reference} \
     -o medaka_${meta.id} \
     -m ${medaka_model} \
     -t ${task.cpus}
