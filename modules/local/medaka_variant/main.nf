@@ -3,7 +3,7 @@ process MEDAKA_VARIANT {
     publishDir "results/medaka", mode: 'copy', overwrite: true
     //errorStrategy 'ignore'
 
-    container 'community.wave.seqera.io/library/pip_medaka:e86ef4ad6b9b868d'
+    container 'community.wave.seqera.io/library/medaka:2.1.1--01dc988f451b713d'
     cpus 4
     memory '6 GB'
 

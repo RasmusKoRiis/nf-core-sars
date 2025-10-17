@@ -3,7 +3,7 @@ process MK_MASK_NO_PRIMER {
     publishDir "results/qc", mode: 'copy', overwrite: true
     //errorStrategy 'ignore'
     
-    container 'community.wave.seqera.io/library/pip_samtools_tool:1112661e1f5d0aae'
+    container 'community.wave.seqera.io/library/samtools:1.22.1--eccb42ff8fb55509'
     input:
     tuple val(meta), path(lowcov_bed)
     val  mask_primer_ends

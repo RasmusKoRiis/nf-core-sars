@@ -3,7 +3,7 @@ process BCFTOOLS_CONSENSUS {
     publishDir "results/consensus", mode: 'copy', overwrite: true
     //errorStrategy 'ignore'
     
-    container 'community.wave.seqera.io/library/bcftools_htslib:0a3fa2654b52006f'
+    container 'community.wave.seqera.io/library/samtools:1.22.1--eccb42ff8fb55509'
     input:
     tuple val(meta), path(vcf)
     path  reference
