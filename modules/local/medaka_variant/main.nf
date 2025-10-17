@@ -15,10 +15,8 @@ process MEDAKA_VARIANT {
 
   script:
   """
-  # 1) Convert coordinate-sorted BAM -> FASTQ (OK for haploid calling)
   samtools fastq ${bam} > ${meta.id}.tmp.fq
 
-  # 2) Call variants (use -s to realign; better around indels)
   medaka_variant \
     -i ${meta.id}.tmp.fq \
     -r ${reference} \
@@ -27,11 +25,8 @@ process MEDAKA_VARIANT {
     -s \
     -t ${task.cpus}
 
-  # 3) Compress + index the correct VCF path for medaka >=2.x
-  VCF="medaka_${meta.id}/medaka.annotated.vcf"
-  bgzip -c "$VCF" > ${meta.id}.vcf.gz
+  bgzip -c medaka_${meta.id}/medaka.annotated.vcf > ${meta.id}.vcf.gz
   tabix -p vcf ${meta.id}.vcf.gz
-
   rm -f ${meta.id}.tmp.fq
   """
 }
