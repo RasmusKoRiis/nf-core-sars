@@ -183,7 +183,7 @@ workflow SARSCOVSEQ() {
 
     DEPTH_ANALYSIS (
         //IRMA.out.bam
-        MINIMAP2_ALIGN.out.map { it -> tuple(it[0], it[1]) }  // (meta, bam)
+        MINIMAP2_ALIGN.out.minimap2
     )
 
 
