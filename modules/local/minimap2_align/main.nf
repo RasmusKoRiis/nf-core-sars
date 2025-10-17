@@ -3,7 +3,8 @@ process MINIMAP2_ALIGN {
     publishDir "results/aln", mode: 'copy', overwrite: true
     //errorStrategy 'ignore'
 
-    container 'quay.io/biocontainers/minimap2:2.28--h43eeafb_0'
+    container 'community.wave.seqera.io/library/minimap2_samtools:33bb43c18d22e29c'
+            
     cpus 4
     memory '4 GB'
     input:
