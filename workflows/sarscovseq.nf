@@ -143,21 +143,24 @@ workflow SARSCOVSEQ() {
     params.medaka_model
     )
 
-    // 4) Tag -> join -> reshape (VERY IMPORTANT)
-    def ch_vcf_tagged  = MEDAKA_VARIANT.out.medaka_var .map { meta, vcf, tbi -> tuple(meta.id, meta, vcf, tbi) }
-    def ch_mask_tagged = ch_mask                      .map { meta, bed       -> tuple(meta.id, meta, bed) }
-
-    // Debug (optional): view shapes
-    // ch_vcf_tagged.view({"VCF TAGGED -> $it"})
-    // ch_mask_tagged.view({"MASK TAGGED -> $it"})
-
-    def ch_consensus_in = ch_vcf_tagged.join(ch_mask_tagged).map { id, meta1, vcf, tbi, _id2, _meta2, bed ->
-    tuple(meta1, vcf, tbi, bed)   // <- final 4-tuple the process expects
+    // Tag both sides by id
+    def ch_vcf_tagged  = MEDAKA_VARIANT.out.medaka_var.map { meta, vcf, tbi ->
+    tuple(meta.id, meta, vcf, tbi)
+    }
+    def ch_mask_tagged = ch_mask.map { meta, bed ->
+    tuple(meta.id, meta, bed)
     }
 
-    // 5) Consensus
+    // JOIN -> reshape using positions from the joined list
+    // joined element = [ id, meta1, vcf, tbi, id2, meta2, bed ]
+    def ch_consensus_in = ch_vcf_tagged.join(ch_mask_tagged).map { j ->
+    // index:      0   1      2    3    4    5      6
+    tuple(j[1], j[2], j[3], j[6])   // (meta, vcf, tbi, bed)
+    }
+
+    // Now call the process with the reshaped channel
     BCFTOOLS_CONSENSUS(
-    ch_consensus_in,                               // <- PASS THE MAPPED CHANNEL
+    ch_consensus_in,
     Channel.value(file(params.reference))
     )
 
