@@ -15,16 +15,14 @@ process ARTIC_MINION {
   tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
   tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
 
-  // choose flags based on presence of params.bed/ref
   script:
-  def haveBed   = params.bed && file(params.bed).exists()
-  def haveRef   = params.ref && file(params.ref).exists()
-  def bedFlag   = haveBed ? "--bed ${params.bed}" : ""
-  def refFlag   = haveRef ? "--ref ${params.ref}" : ""
+  // Treat bed/ref as “use-direct-files” only if BOTH are set
+  def useBedRef = (params.bed && params.ref)
+  def bedRefFlag = useBedRef ? "--bed ${params.bed} --ref ${params.ref}" : ""
+  // If not using bed/ref, ALWAYS pass scheme flags (don’t gate on .exists())
+  def schemeFlag = useBedRef ? "" :
+                   "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
   def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
-  def schemeFlag = (!haveBed && !haveRef && file(scheme_dir)?.exists())
-                   ? "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
-                   : ""
 
   """
   set -euo pipefail
@@ -33,12 +31,17 @@ process ARTIC_MINION {
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
+  echo "ARTIC route: \$([ -n "${bedRefFlag}" ] && echo BED/REF || echo SCHEME)"
+  echo "scheme_dir: ${scheme_dir}"
+  echo "scheme_name: ${scheme_name}"
+  echo "scheme_version: ${scheme_version}"
+  ls -l "${scheme_dir}/${scheme_name}/${scheme_version}" || true
+
   artic minion \
     --normalise ${params.artic_normalise} \
     --threads ${task.cpus} \
     ${schemeFlag} \
-    ${bedFlag} \
-    ${refFlag} \
+    ${bedRefFlag} \
     --model-dir "\$MODELDIR" \
     ${modelFlag} \
     --read-file ${gp_fastq} \
