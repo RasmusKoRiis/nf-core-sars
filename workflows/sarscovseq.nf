@@ -113,15 +113,15 @@ workflow SARSCOVSEQ() {
 
     // MODULE ARTIC
 
-    //ARTIC_GUPPYPLEX(
-    //CHOPPER.out.chopperfastq
-    //)
+    ARTIC_GUPPYPLEX(
+    CHOPPER.out.chopperfastq
+    )
 
-    //ARTIC_MINION_M(
-    //ARTIC_GUPPYPLEX.out.gp_fastq
-    //Channel.value(file(params.primer_bed)),   
-    //Channel.value(file(params.reference))
-    //)
+    ARTIC_MINION_M(
+    ARTIC_GUPPYPLEX.out.gp_fastq,
+    Channel.value(file(params.primer_bed)),   
+    Channel.value(file(params.reference))
+    )
 
 
     //

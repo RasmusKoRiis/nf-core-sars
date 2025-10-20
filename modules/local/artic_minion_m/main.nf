@@ -7,6 +7,8 @@ process ARTIC_MINION_M {
 
   input:
     tuple val(meta), path(gp_fastq)
+    path  bed
+    path  ref
 
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
@@ -17,68 +19,55 @@ process ARTIC_MINION_M {
   """
   set -euo pipefail
 
-  # === Pin Midnight v3 (Quick Lab primer schemes) ===
-  REQ_NAME="ncov-2019_midnight"
-  REQ_VER="v3.0.0"
+  echo "=== ARTIC_MINION_M: BED/REF mode ==="
+  echo "PWD: \$(pwd)"
+  echo "BED: ${bed}"
+  echo "REF: ${ref}"
 
-  SCHEMERoot="\$PWD/primer_schemes"
-  TARGET_DIR="\$SCHEMERoot/\$REQ_NAME/\$REQ_VER"
-  BED_BN="\$REQ_NAME.scheme.bed"
-  REF_BN="\$REQ_NAME.reference.fasta"
-  BED_PATH="\$TARGET_DIR/\$BED_BN"
-  REF_PATH="\$TARGET_DIR/\$REF_BN"
+  [ -s "${bed}" ] || { echo "ERROR: BED missing/empty: ${bed}"; exit 2; }
+  [ -s "${ref}" ] || { echo "ERROR: REF missing/empty: ${ref}"; exit 2; }
 
-  echo "=== Ensuring scheme present: \$REQ_NAME/\$REQ_VER ==="
-  echo "Target dir: \$TARGET_DIR"
-  mkdir -p "\$TARGET_DIR"
+  echo "BED head:"; head -n 3 "${bed}" || true
+  echo "REF header:"; grep -m1 '^>' "${ref}" || true
 
-  py_fetch() {
-  python - "\$1" "\$2" <<'PY'
-  import sys, time, ssl, urllib.request
-  url, out = sys.argv[1], sys.argv[2]
-  ctx = ssl.create_default_context()
-  for i in range(5):               # simple retries
-      try:
-          with urllib.request.urlopen(url, context=ctx, timeout=30) as r:
-              with open(out, "wb") as f:
-                  f.write(r.read())
-          sys.exit(0)
-      except Exception as e:
-          if i == 4:
-              raise
-          time.sleep(2 + i)
-  PY
-  }
+  # Normalize BED to 7 columns (chrom, start, end, primername, pool, strand, sequence)
+  BED7=bed.normalized.bed
 
-  need_dl=false
-  [ -s "\$BED_PATH" ] || need_dl=true
-  [ -s "\$REF_PATH" ] || need_dl=true
+  awk -F'\\t' '
+    BEGIN { OFS="\\t" }
+    /^#/ { print; next }                          # keep headers/comments
+    NF>=7 { print; next }                         # already has sequence
+    NF==6 {
+      len = \$3-\$2; if (len<1) len=1;
+      seq=""; for(i=0;i<len;i++) seq=seq "A";     # dummy sequence of correct length
+      print \$1,\$2,\$3,\$4,\$5,\$6,seq; next
+    }
+    NF==5 {
+      # If strand missing, infer from LEFT/RIGHT in name
+      s = "+"; if (toupper(\$4) ~ /RIGHT/) s="-";
+      len = \$3-\$2; if (len<1) len=1;
+      seq=""; for(i=0;i<len;i++) seq=seq "A";
+      print \$1,\$2,\$3,\$4,\$5,s,seq; next
+    }
+    { 
+      print "ERROR: Unsupported BED line with " NF " columns: " \$0 > "/dev/stderr";
+      exit 11
+    }
+  ' "${bed}" > "\$BED7"
 
-  if \$need_dl; then
-    echo "Downloading from quick-lab/primerschemes (raw GitHub)…"
-    baseurl="https://raw.githubusercontent.com/quick-lab/primerschemes/master/\$REQ_NAME/\$REQ_VER"
-    py_fetch "\$baseurl/\$BED_BN" "\$BED_PATH"
-    py_fetch "\$baseurl/\$REF_BN" "\$REF_PATH"
-  fi
+  echo "Normalized BED preview:"; head -n 3 "\$BED7" || true
 
-  # Sanity checks
-  [ -s "\$BED_PATH" ] || { echo "ERROR: BED missing/empty: \$BED_PATH"; exit 2; }
-  [ -s "\$REF_PATH" ] || { echo "ERROR: REF missing/empty: \$REF_PATH"; exit 2; }
-  echo "== BED head =="; head -n 3 "\$BED_PATH" || true
-  echo "== REF header =="; grep -m1 '^>' "\$REF_PATH" || true
-
-  # === Clair3 models (allowed to no-op if already present) ===
+  # Clair3 models (best effort)
   MODELDIR="\$PWD/clair3_models"
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
-  # === ARTIC run (scheme mode, pinned Midnight v3) ===
+  # Run ARTIC (direct bed/ref)
   artic minion \\
     --normalise ${params.artic_normalise} \\
     --threads ${task.cpus} \\
-    --scheme-directory "\$SCHEMERoot" \\
-    --scheme-name "\$REQ_NAME" \\
-    --scheme-version "\$REQ_VER" \\
+    --bed "\$BED7" \\
+    --ref "${ref}" \\
     --model-dir "\$MODELDIR" \\
     ${modelFlag} \\
     --read-file ${gp_fastq} \\
@@ -92,6 +81,4 @@ process ARTIC_MINION_M {
   [ -f "\$VCF.tbi" ] && cp "\$VCF.tbi" ${meta.id}.pass.vcf.gz.tbi || true
   cp "\$CONS"                         ${meta.id}.consensus.fasta
   """
-
-
 }
