@@ -6,22 +6,22 @@ process ARTIC_MINION {
   cpus { params.artic_threads }
 
   input:
-    tuple val(meta), path(gp_fastq)
-    val   scheme_name
-    val   scheme_version
-    path  scheme_dir
+  tuple val(meta), path(gp_fastq)
+  val   scheme_name
+  val   scheme_version
+  path  scheme_dir
 
   output:
-    tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
-    tuple val(meta), path("${meta.id}.pass.vcf.gz"),     path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
+  tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
+  tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
 
-  // If params.bed/ref exist, we use them. Otherwise we use scheme flags.
+  // choose flags based on presence of params.bed/ref
   script:
-  def haveBed = params.bed && file(params.bed).exists()
-  def haveRef = params.ref && file(params.ref).exists()
-  def bedFlag = haveBed ? "--bed ${params.bed}" : ""
-  def refFlag = haveRef ? "--ref ${params.ref}" : ""
-  def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""   // or leave empty for auto-detect
+  def haveBed   = params.bed && file(params.bed).exists()
+  def haveRef   = params.ref && file(params.ref).exists()
+  def bedFlag   = haveBed ? "--bed ${params.bed}" : ""
+  def refFlag   = haveRef ? "--ref ${params.ref}" : ""
+  def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
   def schemeFlag = (!haveBed && !haveRef && file(scheme_dir)?.exists())
                    ? "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
                    : ""
@@ -29,7 +29,7 @@ process ARTIC_MINION {
   """
   set -euo pipefail
 
-  MODELDIR="${params.artic_model_dir:-$PWD/clair3_models}"
+  MODELDIR="\$PWD/clair3_models"
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
