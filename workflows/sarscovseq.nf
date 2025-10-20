@@ -198,7 +198,7 @@ workflow SARSCOVSEQ() {
         Channel.value(file(params.input)),
         primer,
         //IRMA.out.amended_consensus_report.collect()
-        ARTIC_MINION_M.out.ARTIC_MINION_M.out.artic_consensus_report.collect()
+        ARTIC_MINION_M.out.artic_consensus_report.collect()
     )
 
 
