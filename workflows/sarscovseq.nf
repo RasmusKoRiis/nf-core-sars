@@ -29,6 +29,9 @@ include { MK_MASK_NO_PRIMER           } from '../modules/local/mk_mask_no_primer
 include { MEDAKA_VARIANT              } from '../modules/local/medaka_variant/main'
 include { BCFTOOLS_CONSENSUS          } from '../modules/local/bcftools_consensus/main'
 
+include { ARTIC_GUPPYPLEX             } from '../modules/local/artic_guppyplex/main'
+include { ARTIC_MINION                } from '../modules/local/artic_minion/main'
+
 
 
 
@@ -118,7 +121,7 @@ workflow SARSCOVSEQ() {
     ARTIC_GUPPYPLEX(
     CHOPPER.out.chopperfastq
     )
-    
+
     ARTIC_MINION(
     ARTIC_GUPPYPLEX.out.gp_fastq,
     params.scheme_name,
