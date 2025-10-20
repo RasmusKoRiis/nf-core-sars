@@ -14,79 +14,93 @@ process ARTIC_MINION_M {
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
 
   script:
-  def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
-  """
-  set -euo pipefail
+  // Build the bash script as a single-quoted string (no Groovy interpolation),
+  // then replace placeholders with actual values.
+  def MODELOPT = (params.artic_model ? "--model ${params.artic_model}" : "").trim()
 
-  echo "=== ARTIC_MINION_M: BED/REF mode (consensus-only) ==="
-  echo "PWD: \$(pwd)"
-  echo "BED: ${bed}"
-  echo "REF: ${ref}"
-  [ -s "${bed}" ] || { echo "ERROR: BED missing/empty: ${bed}"; exit 2; }
-  [ -s "${ref}" ] || { echo "ERROR: REF missing/empty: ${ref}"; exit 2; }
+  def cmd = '''
+set -euo pipefail
 
-  echo "BED head:"; head -n 3 "${bed}" || true
-  echo "REF header:"; grep -m1 '^>' "${ref}" || true
+echo "=== ARTIC_MINION_M: BED/REF mode (consensus-only) ==="
+echo "PWD: $(pwd)"
+echo "BED: __BED__"
+echo "REF: __REF__"
+[ -s "__BED__" ] || { echo "ERROR: BED missing/empty: __BED__"; exit 2; }
+[ -s "__REF__" ] || { echo "ERROR: REF missing/empty: __REF__"; exit 2; }
 
-  # Normalize BED to 7 columns (chrom, start, end, primername, pool, strand, sequence)
-  BED7=bed.normalized.bed
-  awk -F'\\t' '
-    BEGIN { OFS="\\t" }
-    /^#/ { print; next }                          # keep headers/comments
-    NF>=7 { print; next }                         # already has sequence
-    NF==6 {
-      len = \\$3-\\$2; if (len<1) len=1;
-      seq=""; for(i=0;i<len;i++) seq=seq "A";     # dummy sequence
-      print \\$1,\\$2,\\$3,\\$4,\\$5,\\$6,seq; next
-    }
-    NF==5 {
-      s = "+"; if (toupper(\\$4) ~ /RIGHT/) s="-"; # infer strand from name
-      len = \\$3-\\$2; if (len<1) len=1;
-      seq=""; for(i=0;i<len;i++) seq=seq "A";
-      print \\$1,\\$2,\\$3,\\$4,\\$5,s,seq; next
-    }
-    {
-      print "ERROR: Unsupported BED line with " NF " columns: " \\$0 > "/dev/stderr";
-      exit 11
-    }
-  ' "${bed}" > "\$BED7"
+echo "BED head:"; head -n 3 "__BED__" || true
+echo "REF header:"; grep -m1 '^>' "__REF__" || true
 
-  echo "Normalized BED preview:"; head -n 3 "\$BED7" || true
+# Normalize BED to 7 columns (chrom, start, end, primername, pool, strand, sequence)
+BED7=bed.normalized.bed
+awk -F'\t' '
+  BEGIN { OFS="\t" }
+  /^#/ { print; next }                          # keep headers/comments
+  NF>=7 { print; next }                         # already has sequence
+  NF==6 {
+    len = $3-$2; if (len<1) len=1;
+    seq=""; for(i=0;i<len;i++) seq=seq "A";     # dummy sequence
+    print $1,$2,$3,$4,$5,$6,seq; next
+  }
+  NF==5 {
+    s = "+"; if (toupper($4) ~ /RIGHT/) s="-";  # infer strand from name
+    len = $3-$2; if (len<1) len=1;
+    seq=""; for(i=0;i<len;i++) seq=seq "A";
+    print $1,$2,$3,$4,$5,s,seq; next
+  }
+  {
+    print "ERROR: Unsupported BED line with " NF " columns: " $0 > "/dev/stderr";
+    exit 11
+  }
+' "__BED__" > "$BED7"
 
-  # Clair3 models (best effort; harmless if already present)
-  MODELDIR="\$PWD/clair3_models"
-  mkdir -p "\$MODELDIR"
-  artic_get_models --model-dir "\$MODELDIR" || true
+echo "Normalized BED preview:"; head -n 3 "$BED7" || true
 
-  # Run ARTIC (direct bed/ref). Even if we only want the consensus, ARTIC still
-  # does its internal VCF steps; we just don’t emit them from the process.
-  artic minion \\
-    --normalise ${params.artic_normalise} \\
-    --threads ${task.cpus} \\
-    --bed "\$BED7" \\
-    --ref "${ref}" \\
-    --model-dir "\$MODELDIR" \\
-    ${modelFlag} \\
-    --read-file ${gp_fastq} \\
-    ${meta.id}
+# Clair3 models (best effort; harmless if already present)
+MODELDIR="$PWD/clair3_models"
+mkdir -p "$MODELDIR"
+artic_get_models --model-dir "$MODELDIR" || true
 
-  # Locate consensus robustly (ARTIC 1.6.x writes in CWD; 1.8.x under sample dir)
-  CONS=""
-  if [ -f "${meta.id}.consensus.fasta" ]; then
-    CONS="${meta.id}.consensus.fasta"
-  elif ls ${meta.id}/*.consensus.fasta >/dev/null 2>&1; then
-    for f in ${meta.id}/*.consensus.fasta; do
-      CONS="\\$f"; break
-    done
-  else
-    echo "ERROR: Consensus fasta not found in known locations." >&2
-    ls -lah || true
-    exit 4
-  fi
+# Run ARTIC (direct bed/ref)
+artic minion \
+  --normalise __NORMALISE__ \
+  --threads __THREADS__ \
+  --bed "$BED7" \
+  --ref "__REF__" \
+  --model-dir "$MODELDIR" \
+  __MODELOPT__ \
+  --read-file __GPFASTQ__ \
+  __METAID__
 
-  # Emit expected filename only if needed (avoid copying onto itself)
-  if [ "\$CONS" != "${meta.id}.consensus.fasta" ]; then
-    cp "\$CONS" "${meta.id}.consensus.fasta"
-  fi
-  """
+# Locate consensus robustly (ARTIC 1.6.x vs 1.8.x layout)
+CONS=""
+if [ -f "__METAID__.consensus.fasta" ]; then
+  CONS="__METAID__.consensus.fasta"
+elif ls __METAID__/*.consensus.fasta >/dev/null 2>&1; then
+  for f in __METAID__/*.consensus.fasta; do
+    CONS="$f"; break
+  done
+else
+  echo "ERROR: Consensus fasta not found in known locations." >&2
+  ls -lah || true
+  exit 4
+fi
+
+# Emit expected filename only if needed (avoid copying onto itself)
+if [ "$CONS" != "__METAID__.consensus.fasta" ]; then
+  cp "$CONS" "__METAID__.consensus.fasta"
+fi
+'''
+
+  // Substitute placeholders safely
+  cmd = cmd
+    .replace('__BED__', bed.toString())
+    .replace('__REF__', ref.toString())
+    .replace('__METAID__', meta.id.toString())
+    .replace('__GPFASTQ__', gp_fastq.toString())
+    .replace('__THREADS__', task.cpus.toString())
+    .replace('__NORMALISE__', params.artic_normalise.toString())
+    .replace('__MODELOPT__', MODELOPT)
+
+  return cmd
 }
