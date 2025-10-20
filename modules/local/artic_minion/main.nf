@@ -6,24 +6,22 @@ process ARTIC_MINION {
   cpus { params.artic_threads }
 
   input:
-  tuple val(meta), path(gp_fastq)
-  val   scheme_name
-  val   scheme_version
-  path  scheme_dir
+    tuple val(meta), path(gp_fastq)
+    val   scheme_name
+    val   scheme_version
+    path  scheme_dir
+    path  bed optional true      
+    path  ref optional true      
 
   output:
   tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
   tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
 
   script:
-  // Treat bed/ref as “use-direct-files” only if BOTH are set
-  def useBedRef = (params.bed && params.ref)
-  def bedRefFlag = useBedRef ? "--bed ${params.bed} --ref ${params.ref}" : ""
-  // If not using bed/ref, ALWAYS pass scheme flags (don’t gate on .exists())
-  def schemeFlag = useBedRef ? "" :
-                   "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
-  def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
-
+  def useBedRef = (bed && ref)            // both provided
+  def bedRefFlag = useBedRef ? "--bed ${bed} --ref ${ref}" : ""
+  def schemeFlag = useBedRef ? "" : "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
+  def modelFlag  = params.artic_model ? "--model ${params.artic_model}" : ""
   """
   set -euo pipefail
 
@@ -32,10 +30,12 @@ process ARTIC_MINION {
   artic_get_models --model-dir "\$MODELDIR" || true
 
   echo "ARTIC route: \$([ -n "${bedRefFlag}" ] && echo BED/REF || echo SCHEME)"
-  echo "scheme_dir: ${scheme_dir}"
-  echo "scheme_name: ${scheme_name}"
-  echo "scheme_version: ${scheme_version}"
-  ls -l "${scheme_dir}/${scheme_name}/${scheme_version}" || true
+  [ -z "${bedRefFlag}" ] && {
+    echo "scheme_dir: ${scheme_dir}"
+    echo "scheme_name: ${scheme_name}"
+    echo "scheme_version: ${scheme_version}"
+    ls -l "${scheme_dir}/${scheme_name}/${scheme_version}" || true
+  }
 
   artic minion \
     --normalise ${params.artic_normalise} \
@@ -55,4 +55,5 @@ process ARTIC_MINION {
   [ -f "\$VCF.tbi" ] && cp "\$VCF.tbi" ${meta.id}.pass.vcf.gz.tbi || true
   cp "\$CONS"                         ${meta.id}.consensus.fasta
   """
+
 }

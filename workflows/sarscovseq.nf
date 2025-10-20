@@ -121,7 +121,9 @@ workflow SARSCOVSEQ() {
     ARTIC_GUPPYPLEX.out.gp_fastq,
     params.scheme_name,
     params.scheme_version,
-    file(params.scheme_dir)             // can be a real dir or a dummy if you want auto-fetch
+    file(params.scheme_dir),
+    file(params.bed),           // NEW
+    file(params.ref)            // NEW
     )
 
     //
