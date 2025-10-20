@@ -119,8 +119,8 @@ workflow SARSCOVSEQ() {
 
     ARTIC_MINION(
     ARTIC_GUPPYPLEX.out.gp_fastq,
-    Channel.value(file(params.bed)),   // must be channels so they stage
-    Channel.value(file(params.ref))
+    Channel.value(file(params.primer_bed)),   
+    Channel.value(file(params.reference))
     )
 
 
