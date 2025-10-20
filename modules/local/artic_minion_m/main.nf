@@ -14,15 +14,13 @@ process ARTIC_MINION_M {
 
   script:
   def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
-
   """
   set -euo pipefail
 
-  # Hard-coded Midnight v3
+  # === Pin Midnight v3 (Quick Lab primer schemes) ===
   REQ_NAME="ncov-2019_midnight"
   REQ_VER="v3.0.0"
 
-  # Put scheme under the workdir so ARTIC can use --scheme-directory
   SCHEMERoot="\$PWD/primer_schemes"
   TARGET_DIR="\$SCHEMERoot/\$REQ_NAME/\$REQ_VER"
   BED_BN="\$REQ_NAME.scheme.bed"
@@ -30,44 +28,51 @@ process ARTIC_MINION_M {
   BED_PATH="\$TARGET_DIR/\$BED_BN"
   REF_PATH="\$TARGET_DIR/\$REF_BN"
 
-  echo "=== Ensuring Midnight v3 scheme is present ==="
-  echo "Target: \$TARGET_DIR"
+  echo "=== Ensuring scheme present: \$REQ_NAME/\$REQ_VER ==="
+  echo "Target dir: \$TARGET_DIR"
   mkdir -p "\$TARGET_DIR"
+
+  py_fetch() {
+  python - "\$1" "\$2" <<'PY'
+  import sys, time, ssl, urllib.request
+  url, out = sys.argv[1], sys.argv[2]
+  ctx = ssl.create_default_context()
+  for i in range(5):               # simple retries
+      try:
+          with urllib.request.urlopen(url, context=ctx, timeout=30) as r:
+              with open(out, "wb") as f:
+                  f.write(r.read())
+          sys.exit(0)
+      except Exception as e:
+          if i == 4:
+              raise
+          time.sleep(2 + i)
+  PY
+  }
 
   need_dl=false
   [ -s "\$BED_PATH" ] || need_dl=true
   [ -s "\$REF_PATH" ] || need_dl=true
 
-  fetch() {
-    url="\$1"; out="\$2"
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 -o "\$out" "\$url"
-    else
-      wget -qO "\$out" "\$url"
-    fi
-  }
-
   if \$need_dl; then
-    echo "Downloading Midnight v3 from quick-lab/primerschemes…"
+    echo "Downloading from quick-lab/primerschemes (raw GitHub)…"
     baseurl="https://raw.githubusercontent.com/quick-lab/primerschemes/master/\$REQ_NAME/\$REQ_VER"
-    fetch "\$baseurl/\$BED_BN" "\$BED_PATH"
-    fetch "\$baseurl/\$REF_BN" "\$REF_PATH"
+    py_fetch "\$baseurl/\$BED_BN" "\$BED_PATH"
+    py_fetch "\$baseurl/\$REF_BN" "\$REF_PATH"
   fi
 
-  # Sanity checks & preview
+  # Sanity checks
   [ -s "\$BED_PATH" ] || { echo "ERROR: BED missing/empty: \$BED_PATH"; exit 2; }
   [ -s "\$REF_PATH" ] || { echo "ERROR: REF missing/empty: \$REF_PATH"; exit 2; }
-  echo "== BED head =="
-  head -n 3 "\$BED_PATH" || true
-  echo "== REF header =="
-  grep -m1 '^>' "\$REF_PATH" || true
+  echo "== BED head =="; head -n 3 "\$BED_PATH" || true
+  echo "== REF header =="; grep -m1 '^>' "\$REF_PATH" || true
 
-  # Models
+  # === Clair3 models (allowed to no-op if already present) ===
   MODELDIR="\$PWD/clair3_models"
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
-  # ARTIC run (scheme mode, hard-coded Midnight v3)
+  # === ARTIC run (scheme mode, pinned Midnight v3) ===
   artic minion \\
     --normalise ${params.artic_normalise} \\
     --threads ${task.cpus} \\
@@ -83,8 +88,10 @@ process ARTIC_MINION_M {
   tabix -p vcf "\$VCF" || true
   CONS=\$(ls ${meta.id}/*.consensus.fasta)
 
-  cp "\$VCF" ${meta.id}.pass.vcf.gz
+  cp "\$VCF"                          ${meta.id}.pass.vcf.gz
   [ -f "\$VCF.tbi" ] && cp "\$VCF.tbi" ${meta.id}.pass.vcf.gz.tbi || true
-  cp "\$CONS" ${meta.id}.consensus.fasta
+  cp "\$CONS"                         ${meta.id}.consensus.fasta
   """
+
+
 }
