@@ -69,19 +69,21 @@ process ARTIC_MINION_M {
     --read-file ${gp_fastq} \\
     ${meta.id}
 
-  # Locate consensus robustly (1.6.x writes in CWD; 1.8.x under sample dir)
+  # Locate consensus robustly (ARTIC 1.6.x vs 1.8.x layout)
   CONS=""
   if [ -f "${meta.id}.consensus.fasta" ]; then
     CONS="${meta.id}.consensus.fasta"
-  elif ls ${meta.id}/*.consensus.fasta >/dev/null 2>&1; then
-    CONS=\$(ls ${meta.id}/*.consensus.fasta | head -n1)
+  elif CONS_CAND=$(ls ${meta.id}/*.consensus.fasta 2>/dev/null | head -n1); then
+    CONS="$CONS_CAND"
   else
     echo "ERROR: Consensus fasta not found in known locations." >&2
-    ls -lah
+    ls -lah || true
     exit 4
   fi
 
-  # Emit expected filename
-  cp "\$CONS" "${meta.id}.consensus.fasta"
+  # Emit expected filename only if needed (avoid copying onto itself)
+  if [ "$CONS" != "${meta.id}.consensus.fasta" ]; then
+    cp "$CONS" "${meta.id}.consensus.fasta"
+  fi
   """
 }
