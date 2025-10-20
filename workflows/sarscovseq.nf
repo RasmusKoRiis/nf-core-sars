@@ -30,7 +30,7 @@ include { MEDAKA_VARIANT              } from '../modules/local/medaka_variant/ma
 include { BCFTOOLS_CONSENSUS          } from '../modules/local/bcftools_consensus/main'
 
 include { ARTIC_GUPPYPLEX             } from '../modules/local/artic_guppyplex/main'
-include { ARTIC_MINION                } from '../modules/local/artic_minion/main'
+include { ARTIC_MINION_M              } from '../modules/local/artic_minion_m/main'
 
 
 
@@ -117,7 +117,7 @@ workflow SARSCOVSEQ() {
     CHOPPER.out.chopperfastq
     )
 
-    ARTIC_MINION(
+    ARTIC_MINION_M(
     ARTIC_GUPPYPLEX.out.gp_fastq,
     Channel.value(file(params.primer_bed)),   
     Channel.value(file(params.reference))
