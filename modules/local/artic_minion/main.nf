@@ -1,4 +1,5 @@
 process ARTIC_MINION {
+  
   tag { "${meta.id}" }
   label 'process_high'
   publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
