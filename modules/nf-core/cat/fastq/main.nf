@@ -3,10 +3,10 @@ process CAT_FASTQ {
     label 'process_low'
     //errorStrategy 'ignore'
 
-    conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ubuntu:20.04' :
-        'nf-core/ubuntu:20.04' }"
+    //conda "${moduleDir}/environment.yml"
+    //container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //    'https://depot.galaxyproject.org/singularity/ubuntu:20.04' :
+    //    'nf-core/ubuntu:20.04' }"
 
     input:
     tuple val(meta), path(reads, stageAs: "input*/*")
