@@ -35,18 +35,18 @@ process ARTIC_MINION_M {
     /^#/ { print; next }                          # keep headers/comments
     NF>=7 { print; next }                         # already has sequence
     NF==6 {
-      len = \$3-\$2; if (len<1) len=1;
-      seq=""; for(i=0;i<len;i++) seq=seq "A";     # dummy sequence of correct length
-      print \$1,\$2,\$3,\$4,\$5,\$6,seq; next
+      len = \\$3-\\$2; if (len<1) len=1;
+      seq=""; for(i=0;i<len;i++) seq=seq "A";     # dummy sequence
+      print \\$1,\\$2,\\$3,\\$4,\\$5,\\$6,seq; next
     }
     NF==5 {
-      s = "+"; if (toupper(\$4) ~ /RIGHT/) s="-"; # infer strand from name
-      len = \$3-\$2; if (len<1) len=1;
+      s = "+"; if (toupper(\\$4) ~ /RIGHT/) s="-"; # infer strand from name
+      len = \\$3-\\$2; if (len<1) len=1;
       seq=""; for(i=0;i<len;i++) seq=seq "A";
-      print \$1,\$2,\$3,\$4,\$5,s,seq; next
+      print \\$1,\\$2,\\$3,\\$4,\\$5,s,seq; next
     }
-    { 
-      print "ERROR: Unsupported BED line with " NF " columns: " \$0 > "/dev/stderr";
+    {
+      print "ERROR: Unsupported BED line with " NF " columns: " \\$0 > "/dev/stderr";
       exit 11
     }
   ' "${bed}" > "\$BED7"
@@ -58,7 +58,8 @@ process ARTIC_MINION_M {
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
-  # Run ARTIC (direct bed/ref)
+  # Run ARTIC (direct bed/ref). Even if we only want the consensus, ARTIC still
+  # does its internal VCF steps; we just don’t emit them from the process.
   artic minion \\
     --normalise ${params.artic_normalise} \\
     --threads ${task.cpus} \\
@@ -69,13 +70,13 @@ process ARTIC_MINION_M {
     --read-file ${gp_fastq} \\
     ${meta.id}
 
-  # Locate consensus robustly (ARTIC 1.6.x vs 1.8.x layout)
+  # Locate consensus robustly (ARTIC 1.6.x writes in CWD; 1.8.x under sample dir)
   CONS=""
   if [ -f "${meta.id}.consensus.fasta" ]; then
     CONS="${meta.id}.consensus.fasta"
   elif ls ${meta.id}/*.consensus.fasta >/dev/null 2>&1; then
     for f in ${meta.id}/*.consensus.fasta; do
-      CONS="$f"; break
+      CONS="\\$f"; break
     done
   else
     echo "ERROR: Consensus fasta not found in known locations." >&2
@@ -84,8 +85,8 @@ process ARTIC_MINION_M {
   fi
 
   # Emit expected filename only if needed (avoid copying onto itself)
-  if [ "$CONS" != "${meta.id}.consensus.fasta" ]; then
-    cp "$CONS" "${meta.id}.consensus.fasta"
+  if [ "\$CONS" != "${meta.id}.consensus.fasta" ]; then
+    cp "\$CONS" "${meta.id}.consensus.fasta"
   fi
   """
 }
