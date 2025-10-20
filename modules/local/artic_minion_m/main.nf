@@ -1,7 +1,7 @@
 process ARTIC_MINION_M {
   tag { "${meta.id}" }
   label 'process_high'
-  publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
+  //publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
   container 'community.wave.seqera.io/library/artic:1.6.2--d4956cdc155b8612'
   cpus { params.artic_threads }
 
@@ -12,6 +12,7 @@ process ARTIC_MINION_M {
 
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
+    path("${meta.id}.consensus.fasta"), emit: artic_consensus_report
 
   script:
   // Build the bash script as a single-quoted string (no Groovy interpolation),

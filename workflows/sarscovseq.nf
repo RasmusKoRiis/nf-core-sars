@@ -157,7 +157,8 @@ workflow SARSCOVSEQ() {
     //
 
     NEXTCLADE (
-        IRMA.out.amended_consensus
+        //IRMA.out.amended_consensus
+        ARTIC_MINION_M.out.artic_consensus
     
     )
 
@@ -196,8 +197,8 @@ workflow SARSCOVSEQ() {
         seq_instrument,
         Channel.value(file(params.input)),
         primer,
-        IRMA.out.amended_consensus_report.collect()
-        //BCFTOOLS_CONSENSUS.out.bcft_report_consensus.collect()
+        //IRMA.out.amended_consensus_report.collect()
+        ARTIC_MINION_M.out.ARTIC_MINION_M.out.artic_consensus_report.collect()
     )
 
 

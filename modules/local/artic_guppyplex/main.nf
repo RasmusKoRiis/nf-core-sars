@@ -1,7 +1,7 @@
 process ARTIC_GUPPYPLEX {
   tag { "${meta.id}" }
   label 'process_medium'
-  publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
+  //publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
   container 'quay.io/artic/fieldbioinformatics:1.6.0'
 
   input:
