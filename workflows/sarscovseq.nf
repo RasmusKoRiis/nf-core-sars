@@ -73,11 +73,6 @@ def parseSampleSheet(sampleSheetPath) {
         .filter { it != null } // Remove null entries (samples with no FASTQ files)
 }
 
-// --- DEBUG PARAMS ---
-println "[DEBUG] params.reference = ${params.reference}"
-println "[DEBUG] params.primer_bed = ${params.primer_bed}"
-println "[DEBUG] params.mask_primer_ends = ${params.mask_primer_ends}"
-
 
 workflow SARSCOVSEQ() {
 
