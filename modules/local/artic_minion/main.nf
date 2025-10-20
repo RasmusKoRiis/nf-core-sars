@@ -2,7 +2,7 @@ process ARTIC_MINION {
   tag { "${meta.id}" }
   label 'process_high'
   publishDir "results/artic/${meta.id}", mode: 'copy', overwrite: true
-  container 'quay.io/artic/fieldbioinformatics:1.6.0'
+  container 'quay.io/artic/fieldbioinformatics:1.8.5'
   cpus { params.artic_threads }
 
   input:
