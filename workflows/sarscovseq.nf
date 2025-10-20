@@ -122,8 +122,8 @@ workflow SARSCOVSEQ() {
     params.scheme_name,
     params.scheme_version,
     file(params.scheme_dir),
-    file(params.bed),           // NEW
-    file(params.ref)            // NEW
+    Channel.value(file(params.bed)),   
+    Channel.value(file(params.ref))  
     )
 
     //
