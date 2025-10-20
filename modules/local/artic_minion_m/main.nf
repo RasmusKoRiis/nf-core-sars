@@ -73,8 +73,10 @@ process ARTIC_MINION_M {
   CONS=""
   if [ -f "${meta.id}.consensus.fasta" ]; then
     CONS="${meta.id}.consensus.fasta"
-  elif CONS_CAND=$(ls ${meta.id}/*.consensus.fasta 2>/dev/null | head -n1); then
-    CONS="$CONS_CAND"
+  elif ls ${meta.id}/*.consensus.fasta >/dev/null 2>&1; then
+    for f in ${meta.id}/*.consensus.fasta; do
+      CONS="$f"; break
+    done
   else
     echo "ERROR: Consensus fasta not found in known locations." >&2
     ls -lah || true
