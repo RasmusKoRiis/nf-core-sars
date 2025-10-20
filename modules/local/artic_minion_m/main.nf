@@ -12,18 +12,16 @@ process ARTIC_MINION_M {
 
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
-    tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
 
   script:
   def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
   """
   set -euo pipefail
 
-  echo "=== ARTIC_MINION_M: BED/REF mode ==="
+  echo "=== ARTIC_MINION_M: BED/REF mode (consensus-only) ==="
   echo "PWD: \$(pwd)"
   echo "BED: ${bed}"
   echo "REF: ${ref}"
-
   [ -s "${bed}" ] || { echo "ERROR: BED missing/empty: ${bed}"; exit 2; }
   [ -s "${ref}" ] || { echo "ERROR: REF missing/empty: ${ref}"; exit 2; }
 
@@ -32,7 +30,6 @@ process ARTIC_MINION_M {
 
   # Normalize BED to 7 columns (chrom, start, end, primername, pool, strand, sequence)
   BED7=bed.normalized.bed
-
   awk -F'\\t' '
     BEGIN { OFS="\\t" }
     /^#/ { print; next }                          # keep headers/comments
@@ -43,8 +40,7 @@ process ARTIC_MINION_M {
       print \$1,\$2,\$3,\$4,\$5,\$6,seq; next
     }
     NF==5 {
-      # If strand missing, infer from LEFT/RIGHT in name
-      s = "+"; if (toupper(\$4) ~ /RIGHT/) s="-";
+      s = "+"; if (toupper(\$4) ~ /RIGHT/) s="-"; # infer strand from name
       len = \$3-\$2; if (len<1) len=1;
       seq=""; for(i=0;i<len;i++) seq=seq "A";
       print \$1,\$2,\$3,\$4,\$5,s,seq; next
@@ -57,7 +53,7 @@ process ARTIC_MINION_M {
 
   echo "Normalized BED preview:"; head -n 3 "\$BED7" || true
 
-  # Clair3 models (best effort)
+  # Clair3 models (best effort; harmless if already present)
   MODELDIR="\$PWD/clair3_models"
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
@@ -73,12 +69,19 @@ process ARTIC_MINION_M {
     --read-file ${gp_fastq} \\
     ${meta.id}
 
-  VCF=\$(ls ${meta.id}/clair3/*.pass.vcf.gz)
-  tabix -p vcf "\$VCF" || true
-  CONS=\$(ls ${meta.id}/*.consensus.fasta)
+  # Locate consensus robustly (1.6.x writes in CWD; 1.8.x under sample dir)
+  CONS=""
+  if [ -f "${meta.id}.consensus.fasta" ]; then
+    CONS="${meta.id}.consensus.fasta"
+  elif ls ${meta.id}/*.consensus.fasta >/dev/null 2>&1; then
+    CONS=\$(ls ${meta.id}/*.consensus.fasta | head -n1)
+  else
+    echo "ERROR: Consensus fasta not found in known locations." >&2
+    ls -lah
+    exit 4
+  fi
 
-  cp "\$VCF"                          ${meta.id}.pass.vcf.gz
-  [ -f "\$VCF.tbi" ] && cp "\$VCF.tbi" ${meta.id}.pass.vcf.gz.tbi || true
-  cp "\$CONS"                         ${meta.id}.consensus.fasta
+  # Emit expected filename
+  cp "\$CONS" "${meta.id}.consensus.fasta"
   """
 }
