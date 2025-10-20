@@ -119,12 +119,10 @@ workflow SARSCOVSEQ() {
 
     ARTIC_MINION(
     ARTIC_GUPPYPLEX.out.gp_fastq,
-    params.scheme_name,
-    params.scheme_version,
-    file(params.scheme_dir),
-    Channel.value(file(params.bed)),   
-    Channel.value(file(params.ref))  
+    Channel.value(file(params.bed)),   // must be channels so they stage
+    Channel.value(file(params.ref))
     )
+
 
     //
     // MODULE: AMPLIGONE. 

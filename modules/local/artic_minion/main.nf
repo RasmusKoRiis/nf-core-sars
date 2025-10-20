@@ -7,41 +7,42 @@ process ARTIC_MINION {
 
   input:
     tuple val(meta), path(gp_fastq)
-    val   scheme_name
-    val   scheme_version
-    path  scheme_dir
-    path  bed optional true      
-    path  ref optional true      
+    path  bed
+    path  ref
 
   output:
-  tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
-  tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
+    tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
+    tuple val(meta), path("${meta.id}.pass.vcf.gz"), path("${meta.id}.pass.vcf.gz.tbi"), emit: artic_vcf
 
   script:
-  def useBedRef = (bed && ref)            // both provided
-  def bedRefFlag = useBedRef ? "--bed ${bed} --ref ${ref}" : ""
-  def schemeFlag = useBedRef ? "" : "--scheme-directory ${scheme_dir} --scheme-name ${scheme_name} --scheme-version ${scheme_version}"
-  def modelFlag  = params.artic_model ? "--model ${params.artic_model}" : ""
+    def modelFlag = params.artic_model ? "--model ${params.artic_model}" : ""
   """
   set -euo pipefail
+
+  echo "=== DEBUG: BED/REF mode only ==="
+  echo "PWD: \$(pwd)"
+  echo "BED path (staged): ${bed}"
+  echo "REF path (staged): ${ref}"
+  ls -l \$(dirname "${bed}") || true
+  ls -l \$(dirname "${ref}") || true
+  echo "BED head:"
+  head -n 3 "${bed}" || true
+  echo "REF header:"
+  grep -m1 '^>' "${ref}" || true
 
   MODELDIR="\$PWD/clair3_models"
   mkdir -p "\$MODELDIR"
   artic_get_models --model-dir "\$MODELDIR" || true
 
-  echo "ARTIC route: \$([ -n "${bedRefFlag}" ] && echo BED/REF || echo SCHEME)"
-  [ -z "${bedRefFlag}" ] && {
-    echo "scheme_dir: ${scheme_dir}"
-    echo "scheme_name: ${scheme_name}"
-    echo "scheme_version: ${scheme_version}"
-    ls -l "${scheme_dir}/${scheme_name}/${scheme_version}" || true
-  }
+  # sanity: make sure files exist and are non-empty
+  [ -s "${bed}" ] || { echo "ERROR: BED missing/empty: ${bed}"; exit 2; }
+  [ -s "${ref}" ] || { echo "ERROR: REF missing/empty: ${ref}"; exit 2; }
 
   artic minion \
     --normalise ${params.artic_normalise} \
     --threads ${task.cpus} \
-    ${schemeFlag} \
-    ${bedRefFlag} \
+    --bed "${bed}" \
+    --ref "${ref}" \
     --model-dir "\$MODELDIR" \
     ${modelFlag} \
     --read-file ${gp_fastq} \
@@ -55,5 +56,4 @@ process ARTIC_MINION {
   [ -f "\$VCF.tbi" ] && cp "\$VCF.tbi" ${meta.id}.pass.vcf.gz.tbi || true
   cp "\$CONS"                         ${meta.id}.consensus.fasta
   """
-
 }
