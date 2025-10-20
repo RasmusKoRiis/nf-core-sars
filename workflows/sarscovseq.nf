@@ -112,6 +112,25 @@ workflow SARSCOVSEQ() {
         CAT_FASTQ.out.reads
     )
 
+
+    // MODULE ARTIC
+
+    ARTIC_GUPPYPLEX(
+    CHOPPER.out.chopperfastq
+    )
+    
+    ARTIC_MINION(
+    ARTIC_GUPPYPLEX.out.gp_fastq,
+    params.scheme_name,
+    params.scheme_version,
+    file(params.scheme_dir)             // can be a real dir or a dummy if you want auto-fetch
+    )
+
+
+
+
+
+
     // MODULE MEDAK CONSENSUS 
 
 
