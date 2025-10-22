@@ -137,19 +137,19 @@ workflow SARSCOVSEQ() {
     // MODULE: IRMA
     //
 
-    IRMA (
-        AMPLIGONE.out.primertrimmedfastq
-    )
+    //IRMA (
+    //    AMPLIGONE.out.primertrimmedfastq
+    //)
 
 
     //
     // MODULE: DEPTH ANALYSIS
     //
 
-    DEPTH_ANALYSIS (
-        IRMA.out.bam
+    //DEPTH_ANALYSIS (
+    //    IRMA.out.bam
 
-    )
+    //)
 
 
     //
