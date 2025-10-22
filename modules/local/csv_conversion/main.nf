@@ -2,7 +2,7 @@
 process CSV_CONVERSION {
     tag "$meta.id"
     label 'process_medium'
-    //errorStrategy 'ignore'
+    errorStrategy 'ignore'
    
 
 

@@ -1,8 +1,6 @@
 process REPORT {
     label 'process_single'
 
-
-
     //conda "bioconda::blast=2.15.0"
     container 'docker.io/rasmuskriis/blast_python_pandas:amd64'
     containerOptions = "-v ${baseDir}/bin:/project-bin" // Mount the bin directory
