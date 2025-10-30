@@ -128,9 +128,9 @@ workflow SARSCOVSEQ() {
     // MODULE: AMPLIGONE. 
     //    
 
-    AMPLIGONE (
-        CHOPPER.out.chopperfastq, Channel.value(file(params.primerdir))
-    )
+    //AMPLIGONE (
+    //    CHOPPER.out.chopperfastq, Channel.value(file(params.primerdir))
+    //)
 
 
     //
