@@ -37,7 +37,7 @@ def classify_dr_from_inhibitors(val):
     if pd.isna(val): return 'NA'
     s = str(val).strip()
     if s == '' or s.upper() == 'NA': return 'NA'
-    return 'ANNI' if 'no mutation' in s.lower() else 'Review'
+    return 'AANI' if 'no mutation' in s.lower() else 'Review'
 
 def gene_cols_present(df, gene):
     patt = re.compile(fr'^{gene}_(aaSubstitutions|aaDeletions|aaInsertions)(?:_\d+)?$')
