@@ -7,7 +7,8 @@ process PRIMER_MISMATCH {
     containerOptions = "-v ${baseDir}/bin:/project-bin"
 
     input:
-    tuple val(meta), path(consensus), path(primer_db)
+    tuple val(meta), path(consensus)
+    path primer_db
 
     output:
     tuple val(meta), path("${meta.id}_primer_mismatches.csv"), emit: primer_mismatches
