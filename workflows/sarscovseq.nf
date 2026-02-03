@@ -191,7 +191,8 @@ workflow SARSCOVSEQ() {
 
     def ch_primer_mismatch_input = ARTIC_MINION_M.out.artic_consensus
         .combine(BUILD_PRIMER_DB.out.primer_db)
-        .map { sample_tuple, primer_db ->
+        .map { combined ->
+            def (sample_tuple, primer_db) = combined
             def (meta, consensus) = sample_tuple
             tuple(meta, consensus, primer_db)
         }
