@@ -73,6 +73,8 @@ nextflow run main.nf -profile docker --runid runid_name  --primerdir primer_fold
 - `--input` (default: `assets/samplesheet.csv`): Path to the samplesheet.
 - `--samplesDir` (default: `../data`): Directory containing the FASTQ files in the structure given above.
 - `--primerdir` (default: `assets/V5.4.2/`): Directory containing the primers used during amplification of target region(s).
+- `--primer_bed` (no default): BED file describing the primer scheme that should be used for ARTIC, depth analysis and primer QC.
+- `--primer_fasta` (optional): Explicit path to the FASTA file containing the primer sequences. If omitted, the pipeline tries to resolve `primers.fasta` relative to `--primerdir` or the BED file.
 
 All parameters are detailed in the `nextflow.config` file.
 
@@ -81,6 +83,8 @@ All parameters are detailed in the `nextflow.config` file.
 The output includes:
 
 - Consensus sequences.
+- Depth-per-position CSV tables with amplicon annotations (`results/depth/*_depth_by_position.csv`).
+- A primer database JSON plus per-sample primer mismatch matrices suited for reporting (Power BI) in `results/primer_metrics/`.
 - Mutation calls.
 - Sequencing statistics (coverage, quality parameters).
 - Drug resistance effects.
@@ -91,4 +95,3 @@ The output includes:
 ## Credits
 
 sarsseq was originally written by Rasmus Kopperud Riis.
-

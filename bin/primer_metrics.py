@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""
+Primer utilities for nf-core/sarscovseq:
+
+ 1) build-db: generate a JSON primer database mirroring the primer set used.
+ 2) mismatch: compute primer mismatch metrics for each sample/primer pair.
+"""
+
+import argparse
+import csv
+import json
+import pathlib
+import re
+from typing import Dict, List, Tuple
+
+
+AMBIGUITY_CODES = {
+    "A": {"A"},
+    "C": {"C"},
+    "G": {"G"},
+    "T": {"T"},
+    "U": {"T"},
+    "R": {"A", "G"},
+    "Y": {"C", "T"},
+    "S": {"G", "C"},
+    "W": {"A", "T"},
+    "K": {"G", "T"},
+    "M": {"A", "C"},
+    "B": {"C", "G", "T"},
+    "D": {"A", "G", "T"},
+    "H": {"A", "C", "T"},
+    "V": {"A", "C", "G"},
+    "N": {"A", "C", "G", "T"},
+}
+
+
+def load_fasta_sequences(fasta_path: pathlib.Path) -> Dict[str, str]:
+    seqs = {}
+    current = None
+    with fasta_path.open("r") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                current = line[1:].split()[0]
+                seqs[current] = []
+            else:
+                if current is None:
+                    raise ValueError(f"FASTA file {fasta_path} is malformed.")
+                seqs[current].append(line.upper())
+    return {k: "".join(v) for k, v in seqs.items()}
+
+
+def derive_amplicon_name(primer_name: str) -> str:
+    if not primer_name:
+        return "UNKNOWN"
+    match = re.split(r"_(LEFT|RIGHT)", primer_name, flags=re.IGNORECASE)
+    if match:
+        return match[0]
+    return primer_name
+
+
+def build_primer_db(primer_bed: pathlib.Path, primer_fasta: pathlib.Path, primer_set_name: str, output: pathlib.Path) -> None:
+    primer_sequences = load_fasta_sequences(primer_fasta)
+    primers: Dict[str, Dict] = {}
+    amplicons: Dict[str, Dict] = {}
+
+    with primer_bed.open("r") as bed:
+        for raw_line in bed:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or line.startswith("track"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 4:
+                continue
+            chrom = parts[0]
+            try:
+                start = int(parts[1])
+                end = int(parts[2])
+            except ValueError:
+                continue
+            name = parts[3]
+            pool = parts[4].strip() if len(parts) > 4 else ""
+            strand = parts[5].strip() if len(parts) > 5 else "+"
+            seq_from_bed = parts[6].strip().upper() if len(parts) > 6 else ""
+            sequence = seq_from_bed or primer_sequences.get(name, "")
+            if not sequence:
+                raise ValueError(f"Missing primer sequence for {name}. Provide a FASTA containing all primers.")
+
+            amplicon_id = derive_amplicon_name(name)
+            start_1 = start + 1
+            end_1 = max(start_1, end)
+            primers[name] = {
+                "name": name,
+                "sequence": sequence,
+                "chrom": chrom,
+                "start": start_1,
+                "end": end_1,
+                "strand": strand or "+",
+                "pool": pool,
+                "amplicon": amplicon_id,
+                "length": len(sequence),
+            }
+
+            amp_key = f"{chrom}:{amplicon_id}"
+            entry = amplicons.setdefault(
+                amp_key,
+                {
+                    "amplicon": amplicon_id,
+                    "chrom": chrom,
+                    "start": start_1,
+                    "end": end_1,
+                    "pools": set(),
+                },
+            )
+            entry["start"] = min(entry["start"], start_1)
+            entry["end"] = max(entry["end"], end_1)
+            if pool:
+                entry["pools"].add(pool)
+
+    formatted_amplicons = {}
+    for amp_key, entry in amplicons.items():
+        formatted_amplicons[entry["amplicon"]] = {
+            "chrom": entry["chrom"],
+            "start": entry["start"],
+            "end": entry["end"],
+            "pools": sorted(entry["pools"]),
+            "length": entry["end"] - entry["start"] + 1,
+        }
+
+    db = {
+        "primer_set": primer_set_name,
+        "primer_bed": str(primer_bed),
+        "primer_fasta": str(primer_fasta),
+        "primers": primers,
+        "amplicons": formatted_amplicons,
+    }
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w") as handle:
+        json.dump(db, handle, indent=2)
+
+
+def reverse_complement(seq: str) -> str:
+    comp = str.maketrans("ACGTRYKMSWBDHVN", "TGCAYRMKSWVHDBN")
+    return seq.upper().translate(comp)[::-1]
+
+
+def bases_match(a: str, b: str) -> bool:
+    a_set = AMBIGUITY_CODES.get(a.upper(), {a.upper()})
+    b_set = AMBIGUITY_CODES.get(b.upper(), {b.upper()})
+    return bool(a_set & b_set)
+
+
+def mismatch_metrics(primer_seq: str, template_seq: str) -> Tuple[int, List[int]]:
+    mismatches = []
+    for idx, (a, b) in enumerate(zip(primer_seq, template_seq), start=1):
+        if not bases_match(a, b):
+            mismatches.append(idx)
+    if len(template_seq) < len(primer_seq):
+        span = range(len(template_seq) + 1, len(primer_seq) + 1)
+        mismatches.extend(span)
+    return len(mismatches), mismatches
+
+
+def load_primer_db(path: pathlib.Path) -> Dict:
+    with path.open("r") as handle:
+        return json.load(handle)
+
+
+def load_consensus_sequence(path: pathlib.Path) -> str:
+    seqs = load_fasta_sequences(path)
+    if not seqs:
+        raise ValueError(f"No sequences found in {path}")
+    # use the first record
+    return next(iter(seqs.values()))
+
+
+def write_mismatch_matrix(
+    consensus_fasta: pathlib.Path,
+    primer_db_path: pathlib.Path,
+    sample_id: str,
+    output: pathlib.Path,
+) -> None:
+    primer_db = load_primer_db(primer_db_path)
+    consensus = load_consensus_sequence(consensus_fasta)
+    primer_set_name = primer_db.get("primer_set", "")
+    primers = primer_db.get("primers", {})
+
+    rows = []
+    for primer_name, entry in primers.items():
+        primer_seq = entry["sequence"].upper()
+        start = int(entry["start"])
+        end = int(entry["end"])
+        template = consensus[start - 1 : end]
+        if len(template) < len(primer_seq):
+            template = template + ("N" * (len(primer_seq) - len(template)))
+        elif len(template) > len(primer_seq):
+            template = template[: len(primer_seq)]
+
+        if entry.get("strand", "+") == "-":
+            template_to_compare = reverse_complement(template)
+        else:
+            template_to_compare = template
+
+        mismatch_count, mismatch_positions = mismatch_metrics(primer_seq, template_to_compare)
+        percent_identity = (
+            ((len(primer_seq) - mismatch_count) / len(primer_seq)) * 100 if primer_seq else 0.0
+        )
+
+        rows.append(
+            {
+                "Sample_ID": sample_id,
+                "Primer_Set": primer_set_name,
+                "Primer_Name": primer_name,
+                "Amplicon": entry.get("amplicon", ""),
+                "Pool": entry.get("pool", ""),
+                "Chromosome": entry.get("chrom", ""),
+                "Start": start,
+                "End": end,
+                "Strand": entry.get("strand", "+"),
+                "Primer_Length": len(primer_seq),
+                "Mismatches": mismatch_count,
+                "Percent_Identity": f"{percent_identity:.2f}",
+                "Mismatch_Positions": ";".join(map(str, mismatch_positions)),
+                "Primer_Sequence": primer_seq,
+                "Template_Sequence": template_to_compare,
+            }
+        )
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "Sample_ID",
+        "Primer_Set",
+        "Primer_Name",
+        "Amplicon",
+        "Pool",
+        "Chromosome",
+        "Start",
+        "End",
+        "Strand",
+        "Primer_Length",
+        "Mismatches",
+        "Percent_Identity",
+        "Mismatch_Positions",
+        "Primer_Sequence",
+        "Template_Sequence",
+    ]
+    with output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Primer helper utilities.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    build = subparsers.add_parser("build-db", help="Create a primer JSON database.")
+    build.add_argument("--primer-bed", required=True, help="Primer BED file.")
+    build.add_argument("--primer-fasta", required=True, help="Primer FASTA file.")
+    build.add_argument("--primer-set-name", required=True, help="Name for this primer set.")
+    build.add_argument("--output", required=True, help="Output JSON path.")
+
+    mismatch = subparsers.add_parser("mismatch", help="Generate primer mismatch matrix for a sample.")
+    mismatch.add_argument("--consensus", required=True, help="Consensus FASTA for the sample.")
+    mismatch.add_argument("--primer-db", required=True, help="Primer JSON database.")
+    mismatch.add_argument("--sample-id", required=True, help="Sample identifier.")
+    mismatch.add_argument("--output", required=True, help="Output CSV path.")
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if args.command == "build-db":
+        build_primer_db(
+            pathlib.Path(args.primer_bed),
+            pathlib.Path(args.primer_fasta),
+            args.primer_set_name,
+            pathlib.Path(args.output),
+        )
+        print(f"[primer-db] Wrote primer database to {args.output}")
+    elif args.command == "mismatch":
+        write_mismatch_matrix(
+            pathlib.Path(args.consensus),
+            pathlib.Path(args.primer_db),
+            args.sample_id,
+            pathlib.Path(args.output),
+        )
+        print(f"[primer-mismatch] Wrote mismatch matrix to {args.output}")
+
+
+if __name__ == "__main__":
+    main()

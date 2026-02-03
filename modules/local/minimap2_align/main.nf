@@ -7,7 +7,7 @@ process MINIMAP2_ALIGN {
   memory '4 GB'
 
   input:
-  tuple val(meta), path(reads)    // List[*.fastq.gz]
+  tuple val(meta), path(reads)    // accepts single FASTQ or list
   path  reference
 
   output:
@@ -17,11 +17,11 @@ process MINIMAP2_ALIGN {
         emit: minimap2
 
   script:
+  def readList = reads instanceof List ? reads.collect{ it.toString() } : [reads.toString()]
   """
-  minimap2 -ax map-ont -t ${task.cpus} ${reference} ${reads.join(' ')} \
+  minimap2 -ax map-ont -t ${task.cpus} ${reference} ${readList.join(' ')} \
     | samtools sort -@ ${task.cpus} -o ${meta.id}.bam
   # force BAI index (SARS-CoV-2 is tiny, so BAI is fine)
   samtools index -b ${meta.id}.bam
   """
 }
-

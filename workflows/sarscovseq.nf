@@ -20,10 +20,10 @@ include { NEXTCLADE                   } from '../modules/local/nextclade/main'
 include { CSV_CONVERSION              } from '../modules/local/csv_conversion/main'
 include { TABLELOOKUP                 } from '../modules/local/tablelookup/main'
 include { REPORT                      } from '../modules/local/report/main'
+include { BUILD_PRIMER_DB             } from '../modules/local/build_primer_db/main'
+include { PRIMER_MISMATCH             } from '../modules/local/primer_mismatch/main'
 include { DEPTH_ANALYSIS              } from '../modules/local/depth_analysis/main'
 
-include { MINIMAP2_ALIGN              } from '../modules/local/minimap2_align/main'
-include { MAKE_DEPTH_MASK             } from '../modules/local/make_depth_mask/main'
 include { PRIMER_MASK                 } from '../modules/local/primer_mask/main'
 include { MK_MASK_NO_PRIMER           } from '../modules/local/mk_mask_no_primer/main'
 include { MEDAKA_VARIANT              } from '../modules/local/medaka_variant/main'
@@ -78,8 +78,63 @@ workflow SARSCOVSEQ() {
 
     main:
 
+    if( !params.primer_bed ) {
+        error "Parameter --primer_bed is required and must point to the BED file for the selected primer scheme."
+    }
+    if( !params.reference ) {
+        error "Parameter --reference is required and must point to the reference FASTA."
+    }
+
+    def primerBedFile = file(params.primer_bed)
+    if( !primerBedFile.exists() ) {
+        error "Primer BED file not found: ${params.primer_bed}"
+    }
+
+    def referenceFile = file(params.reference)
+    if( !referenceFile.exists() ) {
+        error "Reference FASTA file not found: ${params.reference}"
+    }
+
+    def primerDirPath = params.primerdir ? file(params.primerdir) : null
+    def primerFastaCandidates = []
+    if( params.primer_fasta ) {
+        def explicitPrimerFasta = file(params.primer_fasta)
+        if( !explicitPrimerFasta.exists() ) {
+            error "Primer FASTA file not found: ${params.primer_fasta}"
+        }
+        primerFastaCandidates << explicitPrimerFasta
+    }
+    if( primerDirPath?.exists() ) {
+        primerFastaCandidates << file("${params.primerdir}/primers.fasta")
+        primerFastaCandidates << file("${params.primerdir}/SARS-CoV-2.primers.fasta")
+    }
+    def bedParent = primerBedFile.getParent()
+    if( bedParent ) {
+        primerFastaCandidates << file("${bedParent}/primers.fasta")
+        primerFastaCandidates << file("${bedParent}/SARS-CoV-2.primers.fasta")
+    }
+    def primerFastaFile = primerFastaCandidates.find { it && it.exists() }
+    if( !primerFastaFile ) {
+        error "Unable to locate a primers FASTA file. Provide --primer_fasta or ensure a primers.fasta is placed alongside the selected primer directory."
+    }
+
+    def inferredPrimerName = params.primer_set_name
+    if( !inferredPrimerName ) {
+        if( primerDirPath?.exists() ) {
+            inferredPrimerName = primerDirPath.getFileName()?.toString()
+        }
+        if( !inferredPrimerName && bedParent ) {
+            inferredPrimerName = bedParent.getFileName()?.toString()
+        }
+        if( !inferredPrimerName ) {
+            def fileName = primerBedFile.getFileName()?.toString() ?: "primer_scheme"
+            inferredPrimerName = fileName.replaceAll(/\\.bed$/, '')
+        }
+    }
+    def primerSetName = (inferredPrimerName ?: "primer_set").replaceAll(/[^A-Za-z0-9._-]+/, "_")
+
     def currentDir = System.getProperty('user.dir')
-    
+
 
 
     ch_sample_information = parseSampleSheet(params.input) // Use params.input directly
@@ -92,6 +147,12 @@ workflow SARSCOVSEQ() {
             tuple(meta, files.toList())
         }
     .set { read_input }
+
+    BUILD_PRIMER_DB(
+        Channel.value(primerBedFile),
+        Channel.value(primerFastaFile),
+        Channel.value(primerSetName)
+    )
 
 
     //
@@ -118,9 +179,25 @@ workflow SARSCOVSEQ() {
     )
 
     ARTIC_MINION_M(
-    ARTIC_GUPPYPLEX.out.gp_fastq,
-    Channel.value(file(params.primer_bed)),   
-    Channel.value(file(params.reference))
+        ARTIC_GUPPYPLEX.out.gp_fastq,
+        Channel.value(primerBedFile),
+        Channel.value(referenceFile)
+    )
+
+    DEPTH_ANALYSIS(
+        ARTIC_MINION_M.out.artic_bam,
+        Channel.value(primerBedFile)
+    )
+
+    def ch_primer_mismatch_input = ARTIC_MINION_M.out.artic_consensus
+        .combine(BUILD_PRIMER_DB.out.primer_db)
+        .map { sample_tuple, primer_db ->
+            def (meta, consensus) = sample_tuple
+            tuple(meta, consensus, primer_db)
+        }
+
+    PRIMER_MISMATCH(
+        ch_primer_mismatch_input
     )
 
 

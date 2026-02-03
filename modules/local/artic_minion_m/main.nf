@@ -13,6 +13,10 @@ process ARTIC_MINION_M {
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
     path("${meta.id}.consensus.fasta"), emit: artic_consensus_report
+    tuple val(meta),
+          path("${meta.id}.primertrimmed.rg.sorted.bam"),
+          path("${meta.id}.primertrimmed.rg.sorted.bam.bai"),
+          emit: artic_bam
 
   script:
   def MODELOPT = (params.artic_model ? "--model ${params.artic_model}" : "").trim()
@@ -76,6 +80,28 @@ fi
 awk -v H=">__METAID__" 'BEGIN{repl=0} /^>/{print H; next} {print}' \
   "__METAID__.consensus.fasta" > "__METAID__.consensus.tmp" && \
   mv "__METAID__.consensus.tmp" "__METAID__.consensus.fasta"
+
+# Grab primer-trimmed BAM for downstream depth analysis
+BAM_CANDIDATE=""
+if [ -f "__METAID__.primertrimmed.rg.sorted.bam" ]; then
+  BAM_CANDIDATE="__METAID__.primertrimmed.rg.sorted.bam"
+elif ls __METAID__/*.primertrimmed.rg.sorted.bam >/dev/null 2>&1; then
+  for f in __METAID__/*.primertrimmed.rg.sorted.bam; do BAM_CANDIDATE="$f"; break; done
+fi
+
+if [ -z "$BAM_CANDIDATE" ]; then
+  echo "ERROR: Could not find primertrimmed sorted BAM from ARTIC output." >&2
+  ls -R || true
+  exit 6
+fi
+
+cp "$BAM_CANDIDATE" "__METAID__.primertrimmed.rg.sorted.bam"
+
+if [ -f "${BAM_CANDIDATE}.bai" ]; then
+  cp "${BAM_CANDIDATE}.bai" "__METAID__.primertrimmed.rg.sorted.bam.bai"
+else
+  samtools index -b "__METAID__.primertrimmed.rg.sorted.bam"
+fi
 
 echo "Final header:"
 grep -m1 '^>' "__METAID__.consensus.fasta" || true
