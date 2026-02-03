@@ -1,7 +1,7 @@
 process ARTIC_MINION_M {
   tag { "${meta.id}" }
   label 'process_high'
-  errorStrategy 'ignore'
+  //errorStrategy 'ignore'
   container 'community.wave.seqera.io/library/artic:1.6.2--d4956cdc155b8612'
   cpus { params.artic_threads }
 
