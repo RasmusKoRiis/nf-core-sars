@@ -95,12 +95,21 @@ if [ -z "$BAM_CANDIDATE" ]; then
   exit 6
 fi
 
-cp "$BAM_CANDIDATE" "__METAID__.primertrimmed.rg.sorted.bam"
-
-if [ -f "${BAM_CANDIDATE}.bai" ]; then
-  cp "${BAM_CANDIDATE}.bai" "__METAID__.primertrimmed.rg.sorted.bam.bai"
+TARGET_BAM="__METAID__.primertrimmed.rg.sorted.bam"
+if [ "$BAM_CANDIDATE" != "$TARGET_BAM" ]; then
+  cp "$BAM_CANDIDATE" "$TARGET_BAM"
 else
-  samtools index -b "__METAID__.primertrimmed.rg.sorted.bam"
+  echo "Reusing BAM already at expected path: $TARGET_BAM"
+fi
+
+TARGET_BAI="${TARGET_BAM}.bai"
+BAM_INDEX_SOURCE="${BAM_CANDIDATE}.bai"
+if [ "$BAM_INDEX_SOURCE" != "$TARGET_BAI" ] && [ -f "$BAM_INDEX_SOURCE" ]; then
+  cp "$BAM_INDEX_SOURCE" "$TARGET_BAI"
+elif [ -f "$TARGET_BAI" ]; then
+  echo "Existing BAM index found for $TARGET_BAM"
+else
+  samtools index -b "$TARGET_BAM"
 fi
 
 echo "Final header:"
