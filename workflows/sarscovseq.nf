@@ -153,6 +153,7 @@ workflow SARSCOVSEQ() {
         Channel.value(primerFastaFile),
         Channel.value(primerSetName)
     )
+    BUILD_PRIMER_DB.out.primer_db.into { ch_primer_db ; ch_primer_db_mismatch }
 
 
     //
@@ -190,7 +191,7 @@ workflow SARSCOVSEQ() {
     )
 
     def ch_primer_mismatch_input = ARTIC_MINION_M.out.artic_consensus
-        .combine(BUILD_PRIMER_DB.out.primer_db)
+        .combine(ch_primer_db_mismatch)
         .map { combined ->
             def (sample_tuple, primer_db) = combined
             def (meta, consensus) = sample_tuple
