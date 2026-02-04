@@ -177,11 +177,31 @@ def load_consensus_sequence(path: pathlib.Path) -> str:
     return next(iter(seqs.values()))
 
 
+def find_best_alignment(primer_seq: str, window_seq: str) -> Tuple[int, List[int], int, str]:
+    """Slide the primer across the window and return the alignment with the fewest mismatches."""
+    primer_len = len(primer_seq)
+    if primer_len == 0:
+        return 0, [], 0, ""
+    if len(window_seq) < primer_len:
+        window_seq = window_seq + ("N" * (primer_len - len(window_seq)))
+    max_offset = len(window_seq) - primer_len
+    best = (primer_len + 1, [], 0, window_seq[:primer_len])
+    for offset in range(max_offset + 1):
+        candidate = window_seq[offset : offset + primer_len]
+        mismatch_count, mismatch_positions = mismatch_metrics(primer_seq, candidate)
+        if mismatch_count < best[0]:
+            best = (mismatch_count, mismatch_positions, offset, candidate)
+            if mismatch_count == 0:
+                break
+    return best
+
+
 def write_mismatch_matrix(
     consensus_fasta: pathlib.Path,
     primer_db_path: pathlib.Path,
     sample_id: str,
     output: pathlib.Path,
+    flank: int = 30,
 ) -> None:
     primer_db = load_primer_db(primer_db_path)
     consensus = load_consensus_sequence(consensus_fasta)
@@ -193,18 +213,18 @@ def write_mismatch_matrix(
         primer_seq = entry["sequence"].upper()
         start = int(entry["start"])
         end = int(entry["end"])
-        template = consensus[start - 1 : end]
-        if len(template) < len(primer_seq):
-            template = template + ("N" * (len(primer_seq) - len(template)))
-        elif len(template) > len(primer_seq):
-            template = template[: len(primer_seq)]
-
+        flank_len = max(0, flank)
+        window_start = max(0, start - 1 - flank_len)
+        window_end = min(len(consensus), end + flank_len)
+        template_window = consensus[window_start:window_end]
         if entry.get("strand", "+") == "-":
-            template_to_compare = reverse_complement(template)
+            oriented_window = reverse_complement(template_window)
         else:
-            template_to_compare = template
+            oriented_window = template_window
 
-        mismatch_count, mismatch_positions = mismatch_metrics(primer_seq, template_to_compare)
+        mismatch_count, mismatch_positions, best_offset, best_segment = find_best_alignment(
+            primer_seq, oriented_window
+        )
         percent_identity = (
             ((len(primer_seq) - mismatch_count) / len(primer_seq)) * 100 if primer_seq else 0.0
         )
@@ -225,7 +245,8 @@ def write_mismatch_matrix(
                 "Percent_Identity": f"{percent_identity:.2f}",
                 "Mismatch_Positions": ";".join(map(str, mismatch_positions)),
                 "Primer_Sequence": primer_seq,
-                "Template_Sequence": template_to_compare,
+                "Template_Sequence": best_segment,
+                "Alignment_Offset": best_offset,
             }
         )
 
@@ -246,6 +267,7 @@ def write_mismatch_matrix(
         "Mismatch_Positions",
         "Primer_Sequence",
         "Template_Sequence",
+        "Alignment_Offset",
     ]
     with output.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -269,6 +291,12 @@ def parse_args() -> argparse.Namespace:
     mismatch.add_argument("--primer-db", required=True, help="Primer JSON database.")
     mismatch.add_argument("--sample-id", required=True, help="Sample identifier.")
     mismatch.add_argument("--output", required=True, help="Output CSV path.")
+    mismatch.add_argument(
+        "--flank",
+        type=int,
+        default=30,
+        help="Number of bases to extend on each side of the primer coordinates when extracting the consensus window.",
+    )
 
     return parser.parse_args()
 
@@ -289,6 +317,7 @@ def main():
             pathlib.Path(args.primer_db),
             args.sample_id,
             pathlib.Path(args.output),
+            flank=args.flank,
         )
         print(f"[primer-mismatch] Wrote mismatch matrix to {args.output}")
 
