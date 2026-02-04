@@ -2,7 +2,7 @@
 process DEPTH_ANALYSIS {
     tag "$meta.id"
     label 'process_medium'
-    publishDir "results/depth", mode: 'copy', overwrite: true
+    publishDir "${params.outdir ?: 'results'}/depth", mode: 'copy', overwrite: true
     errorStrategy 'ignore'
 
     container 'docker.io/rasmuskriis/nextclade-python'

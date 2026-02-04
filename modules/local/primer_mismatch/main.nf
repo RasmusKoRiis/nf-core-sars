@@ -1,7 +1,7 @@
 process PRIMER_MISMATCH {
     tag "$meta.id"
     label 'process_medium'
-    publishDir "results/primer_metrics", mode: 'copy', overwrite: true
+    publishDir "${params.outdir ?: 'results'}/primer_metrics", mode: 'copy', overwrite: true
 
     container 'docker.io/rasmuskriis/nextclade-python'
     containerOptions = "-v ${baseDir}/bin:/project-bin"

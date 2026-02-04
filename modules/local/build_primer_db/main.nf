@@ -1,7 +1,7 @@
 process BUILD_PRIMER_DB {
     tag "primer_db"
     label 'process_single'
-    publishDir "results/primer_metrics", mode: 'copy', overwrite: true
+    publishDir "${params.outdir ?: 'results'}/primer_metrics", mode: 'copy', overwrite: true
 
     container 'docker.io/rasmuskriis/nextclade-python'
     containerOptions = "-v ${baseDir}/bin:/project-bin"
