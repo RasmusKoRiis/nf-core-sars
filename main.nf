@@ -19,6 +19,7 @@ nextflow.enable.dsl = 2
 
 include { SARSCOVSEQ  } from './workflows/sarscovseq'
 include { SARSCOVSEQFASTA  } from './workflows/sarscovseq-fasta'
+include { SARSCOVSEQPRIMERCHECK } from './workflows/primercheck'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_sarscovseq_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_sarscovseq_pipeline'
 
@@ -53,6 +54,11 @@ workflow NFCORE_SARSCOVSEQ {
     //
     } else if (params.file == 'fastq-workflow') {
         SARSCOVSEQ()
+    //
+    // WORKFLOW: PRIMER CHECK FROM FASTA
+    //
+    } else if (params.file == 'primercheck-workflow') {
+        SARSCOVSEQPRIMERCHECK()
     }
 
 }

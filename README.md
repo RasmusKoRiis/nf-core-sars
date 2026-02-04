@@ -75,6 +75,7 @@ nextflow run main.nf -profile docker --runid runid_name  --primerdir primer_fold
 - `--primerdir` (default: `assets/V5.4.2/`): Directory containing the primers used during amplification of target region(s).
 - `--primer_bed` (no default): BED file describing the primer scheme that should be used for ARTIC, depth analysis and primer QC.
 - `--primer_fasta` (optional): Explicit path to the FASTA file containing the primer sequences. If omitted, the pipeline tries to resolve `primers.fasta` relative to `--primerdir` or the BED file.
+- `--file primercheck-workflow`: Run the FASTA-only primer QC workflow.
 
 All parameters are detailed in the `nextflow.config` file.
 
@@ -91,6 +92,38 @@ The output includes:
 - A report in CSV format.
 - A multiple FASTA file of sequences that passed quality filters.
 
+## Primer-only workflow
+
+When you only need primer mismatch statistics for consensus FASTA files, launch the primer-only workflow:
+
+```bash
+nextflow run main.nf -profile docker \
+    --file primercheck-workflow \
+    --fasta /path/to/multi.fasta \
+    --primer_bed /path/to/primer.scheme.bed \
+    --primer_fasta /path/to/primers.fasta \
+    --primer_set_name VM.3 \
+    --runid VM3_PRIMER_Q1 \
+    --outdir ./primercheck-results
+```
+
+This splits each multi-FASTA into per-sequence files, builds the primer database for the provided scheme and writes primer mismatch CSVs to `primer_metrics/` inside `--outdir`.
+
+### SMB helper script
+
+The `wrapper-primercheck.sh` script downloads the requested FASTA/BED/primer FASTA from the N-drive (`//pos1-fhi-svm01.fhi.no/styrt`) via `smbclient` and runs the workflow:
+
+```bash
+./wrapper-primercheck.sh \
+    -f 2025-02-05_Export.fasta \
+    -b VM.3.scheme.bed \
+    -P VM.3.primers.fasta \
+    -n VM.3 \
+    -r VM3_Q1 \
+    -o /mnt/tempdata/primercheck-run
+```
+
+Store SMB credentials in `~/.smbcreds` (same format as other wrappers).
 
 ## Credits
 

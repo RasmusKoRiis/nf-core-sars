@@ -9,6 +9,7 @@ process PRIMER_MISMATCH {
     input:
     tuple val(meta), path(consensus)
     path primer_db
+    val run_id
 
     output:
     tuple val(meta), path("${meta.id}_primer_mismatches.csv"), emit: primer_mismatches
@@ -19,6 +20,7 @@ process PRIMER_MISMATCH {
         --consensus ${consensus} \
         --primer-db ${primer_db} \
         --sample-id ${meta.id} \
+        --run-id ${run_id} \
         --output ${meta.id}_primer_mismatches.csv
     """
 }

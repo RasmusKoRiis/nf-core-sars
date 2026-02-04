@@ -202,6 +202,7 @@ def write_mismatch_matrix(
     sample_id: str,
     output: pathlib.Path,
     flank: int = 30,
+    run_id: str = "Unknown",
 ) -> None:
     primer_db = load_primer_db(primer_db_path)
     consensus = load_consensus_sequence(consensus_fasta)
@@ -231,6 +232,7 @@ def write_mismatch_matrix(
 
         rows.append(
             {
+                "Run_ID": run_id,
                 "Sample_ID": sample_id,
                 "Primer_Set": primer_set_name,
                 "Primer_Name": primer_name,
@@ -252,6 +254,7 @@ def write_mismatch_matrix(
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
+        "Run_ID",
         "Sample_ID",
         "Primer_Set",
         "Primer_Name",
@@ -297,6 +300,12 @@ def parse_args() -> argparse.Namespace:
         default=30,
         help="Number of bases to extend on each side of the primer coordinates when extracting the consensus window.",
     )
+    mismatch.add_argument(
+        "--run-id",
+        type=str,
+        default="Unknown",
+        help="Run identifier to embed into the mismatch output.",
+    )
 
     return parser.parse_args()
 
@@ -318,6 +327,7 @@ def main():
             args.sample_id,
             pathlib.Path(args.output),
             flank=args.flank,
+            run_id=args.run_id,
         )
         print(f"[primer-mismatch] Wrote mismatch matrix to {args.output}")
 

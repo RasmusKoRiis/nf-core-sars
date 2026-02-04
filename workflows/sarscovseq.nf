@@ -191,7 +191,8 @@ workflow SARSCOVSEQ() {
 
     PRIMER_MISMATCH(
         ARTIC_MINION_M.out.artic_consensus,
-        BUILD_PRIMER_DB.out.primer_db
+        BUILD_PRIMER_DB.out.primer_db,
+        Channel.value(params.runid)
     )
 
 
