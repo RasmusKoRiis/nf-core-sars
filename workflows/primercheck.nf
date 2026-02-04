@@ -70,7 +70,10 @@ workflow SARSCOVSEQPRIMERCHECK {
     ch_single_seq = SPLIT_PRIMER_FASTA.out.split_fastas
         .flatMap { meta, files ->
             files.collect { f ->
-                def seq_id = f.getBaseName().replaceAll(/\.(fa|fasta|fna)$/,'')
+                def prefix = meta.id ? "${meta.id}_" : ""
+                def seq_id = f.getBaseName()
+                    .replaceFirst("^${prefix}", '')
+                    .replaceAll(/\.(fa|fasta|fna)$/,'')
                 tuple([ id: seq_id ], f)
             }
         }
