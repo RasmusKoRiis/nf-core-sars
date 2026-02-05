@@ -297,7 +297,7 @@ def parse_args() -> argparse.Namespace:
     mismatch.add_argument(
         "--flank",
         type=int,
-        default=30,
+        default=80,
         help="Number of bases to extend on each side of the primer coordinates when extracting the consensus window.",
     )
     mismatch.add_argument(
