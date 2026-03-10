@@ -61,8 +61,43 @@ def derive_amplicon_name(primer_name: str) -> str:
     return primer_name
 
 
+def primer_name_aliases(primer_name: str) -> List[str]:
+    """
+    Generate alternative FASTA header candidates for a BED primer name.
+    Handles common naming differences, for example:
+      SARS-CoV-2_10_LEFT_2 <-> SARSCoV_amplicon_10_LEFT_alt1
+    """
+    aliases: List[str] = [primer_name]
+
+    normalized = primer_name.replace("SARS-CoV-2", "SARSCoV")
+    if normalized != primer_name:
+        aliases.append(normalized)
+
+    m = re.match(r"^SARS-CoV-2_(\d+)_(LEFT|RIGHT)_(\d+)$", primer_name)
+    if m:
+        amplicon, side, variant = m.groups()
+        base = f"SARSCoV_amplicon_{amplicon}_{side}"
+        aliases.append(base)
+        try:
+            variant_i = int(variant)
+            if variant_i > 1:
+                aliases.append(f"{base}_alt{variant_i - 1}")
+        except ValueError:
+            pass
+
+    # De-duplicate while preserving order.
+    deduped = []
+    seen = set()
+    for alias in aliases:
+        if alias not in seen:
+            seen.add(alias)
+            deduped.append(alias)
+    return deduped
+
+
 def build_primer_db(primer_bed: pathlib.Path, primer_fasta: pathlib.Path, primer_set_name: str, output: pathlib.Path) -> None:
     primer_sequences = load_fasta_sequences(primer_fasta)
+    primer_sequences_ci = {k.upper(): v for k, v in primer_sequences.items()}
     primers: Dict[str, Dict] = {}
     amplicons: Dict[str, Dict] = {}
 
@@ -84,7 +119,15 @@ def build_primer_db(primer_bed: pathlib.Path, primer_fasta: pathlib.Path, primer
             pool = parts[4].strip() if len(parts) > 4 else ""
             strand = parts[5].strip() if len(parts) > 5 else "+"
             seq_from_bed = parts[6].strip().upper() if len(parts) > 6 else ""
-            sequence = seq_from_bed or primer_sequences.get(name, "")
+            sequence = seq_from_bed
+            if not sequence:
+                for alias in primer_name_aliases(name):
+                    sequence = primer_sequences.get(alias, "")
+                    if sequence:
+                        break
+                    sequence = primer_sequences_ci.get(alias.upper(), "")
+                    if sequence:
+                        break
             if not sequence:
                 raise ValueError(f"Missing primer sequence for {name}. Provide a FASTA containing all primers.")
 
