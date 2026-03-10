@@ -73,7 +73,8 @@ nextflow run main.nf -profile docker --runid runid_name  --primerdir primer_fold
 - `--input` (default: `assets/samplesheet.csv`): Path to the samplesheet.
 - `--samplesDir` (default: `../data`): Directory containing the FASTQ files in the structure given above.
 - `--primerdir` (default: `assets/V5.4.2/`): Directory containing the primers used during amplification of target region(s).
-- `--primer_bed` (no default): BED file describing the primer scheme that should be used for ARTIC, depth analysis and primer QC.
+- `--primer_bed` (optional): BED file describing the primer scheme used for ARTIC, depth analysis and primer QC. If omitted, the pipeline tries to resolve a `.scheme.bed` file from `--primerdir`.
+- `--reference` (optional): Reference FASTA for ARTIC consensus. If omitted, the pipeline tries to resolve a `*.reference.fasta` file from `--primerdir`.
 - `--primer_fasta` (optional): Explicit path to the FASTA file containing the primer sequences. If omitted, the pipeline tries to resolve `primers.fasta` relative to `--primerdir` or the BED file.
 - `--file primercheck-workflow`: Run the FASTA-only primer QC workflow.
 

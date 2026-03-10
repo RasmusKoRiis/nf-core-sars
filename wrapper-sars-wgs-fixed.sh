@@ -1,0 +1,351 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Activate conda base functions
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Maintained by: Rasmus Kopperud Riis (rasmuskopperud.riis@fhi.no)
+# Version: dev
+
+SCRIPT_NAME=$(basename "$0")
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  -h                 Display this help message"
+    echo "  -r <run>           Specify the run name (e.g., INF077) (required)"
+    echo "  -p <primer>        Specify the primer version (e.g., V5.4.2)"
+    echo "  -a <agens>         Specify agens (e.g., sars) (required)"
+    echo "  -s <season>        Specify the season directory of the fastq files on the N-drive (e.g., Ses2425)"
+    echo "  -y <year>          Specify the year directory of the fastq files on the N-drive (required)"
+    echo "  -v <validation>    Specify validation flag (e.g., VER)"
+    exit 1
+}
+
+# Initialize variables
+RUN=""
+AGENS=""
+SEASON=""
+YEAR=""
+PRIMER=""
+VALIDATION_FLAG=""
+
+# Parse options
+while getopts "hr:p:a:s:y:v:" opt; do
+    case "$opt" in
+        h) usage ;;
+        r) RUN="$OPTARG" ;;
+        p) PRIMER="$OPTARG" ;;
+        a) AGENS="$OPTARG" ;;
+        s) SEASON="$OPTARG" ;;
+        y) YEAR="$OPTARG" ;;
+        v) VALIDATION_FLAG="$OPTARG" ;;
+        ?) usage ;;
+    esac
+done
+
+# Basic validation
+if [ -z "${RUN}" ] || [ -z "${AGENS}" ] || [ -z "${YEAR}" ]; then
+    echo "ERROR: -r <run>, -a <agens>, and -y <year> are required."
+    usage
+fi
+
+echo "Run: $RUN"
+echo "Primer: ${PRIMER:-}"
+echo "Agens: $AGENS"
+echo "Season: ${SEASON:-}"
+echo "Year: $YEAR"
+echo "Validation Flag: ${VALIDATION_FLAG:-}"
+
+################################################################################
+# Repo sync
+################################################################################
+REPO="$HOME/ngs_scripts"
+REPO_URL="https://github.com/folkehelseinstituttet/ngs_scripts.git"
+
+if [ -d "$REPO" ]; then
+    echo "Directory 'ngs_scripts' exists. Pulling latest changes..."
+    cd "$REPO"
+    git pull
+else
+    echo "Directory 'ngs_scripts' does not exist. Cloning repository..."
+    git clone "$REPO_URL" "$REPO"
+fi
+cd "$HOME"
+
+# Sometimes the pipeline has been cloned locally. Remove it to avoid version conflicts
+rm -rf "$HOME/sarsseq"
+
+# Export the access token for web monitoring with tower
+export TOWER_ACCESS_TOKEN=eyJ0aWQiOiA4ODYzfS5mZDM1MjRkYTMwNjkyOWE5ZjdmZjdhOTVkODk3YjI5YTdjYzNlM2Zm
+# Add workspace ID for Virus_NGS
+export TOWER_WORKSPACE_ID=150755685543204
+
+################################################################################
+# Environment / SMB
+################################################################################
+BASE_DIR="/mnt/tempdata"
+TMP_DIR="/mnt/tempdata/fastq"
+SMB_AUTH="/home/ngs/.smbcreds"
+SMB_HOST="//pos1-fhi-svm01.fhi.no/styrt"
+
+# Where to put results on storage (default)
+SMB_DIR="Virologi/NGS/1-NGS-Analyser/1-Rutine/2-Resultater/SARS-CoV-2/1-Nanopore/${YEAR}"
+
+# If validation flag is set, update analysis dir and skip full results move step
+if [ -n "${VALIDATION_FLAG}" ]; then
+    SMB_DIR_ANALYSIS="Virologi/NGS/1-NGS-Analyser/1-Rutine/2-Resultater/SARS-CoV-2/4-Validering/1-sarsseq-validering/Run"
+    SKIP_RESULTS_MOVE=true
+else
+    SKIP_RESULTS_MOVE=false
+fi
+
+# Input fastq dir on storage
+current_year=$(date +"%Y")
+if [ "$YEAR" -eq "$current_year" ]; then
+    SMB_INPUT="Virologi/NGS/0-Sekvenseringsbiblioteker/Nanopore_Grid_Run/${RUN}"
+elif [ "$YEAR" -lt "$current_year" ]; then
+    SMB_INPUT="Virologi/NGS/0-Sekvenseringsbiblioteker/Nanopore_Grid_Run/${RUN}"
+else
+    echo "Error: Year cannot be larger than $current_year"
+    exit 1
+fi
+
+################################################################################
+# Helper functions
+################################################################################
+SARS_DATABASE="/mnt/tempdata/sars_db/assets"
+mkdir -p "$SARS_DATABASE"
+
+download_db() {
+    local remote_path="$1"
+    local local_dir="$2"
+    local base
+    base="$(basename "$remote_path")"
+
+    echo "Downloading DB: $remote_path -> $local_dir/$base"
+    smbclient "$SMB_HOST" -A "$SMB_AUTH" -D "$(dirname "$remote_path")" <<EOF
+prompt OFF
+lcd "$local_dir"
+mget "$base"
+EOF
+}
+
+upload_db() {
+    local local_file="$1"
+    local remote_path="$2"
+    local base
+    base="$(basename "$remote_path")"
+
+    echo "Uploading DB: $local_file -> $remote_path"
+    smbclient "$SMB_HOST" -A "$SMB_AUTH" -D "$(dirname "$remote_path")" <<EOF
+prompt OFF
+lcd "$(dirname "$local_file")"
+mput "$base"
+EOF
+}
+
+# Concatenate many CSVs into one, keeping header only once
+cat_csv_keep_header() {
+    local out="$1"; shift
+    local files=("$@")
+
+    if [ "${#files[@]}" -eq 0 ]; then
+        echo "No files provided to cat_csv_keep_header for $out"
+        return 0
+    fi
+
+    head -n 1 "${files[0]}" > "$out"
+    for f in "${files[@]}"; do
+        tail -n +2 "$f" >> "$out" || true
+    done
+}
+
+# Append NEW rows into MASTER, keep master's header, dedup by exact line
+append_dedup() {
+    local master="$1"
+    local newfile="$2"
+
+    if [ ! -s "$newfile" ]; then
+        echo "No new data in $newfile"
+        return 0
+    fi
+
+    if [ ! -f "$master" ] || [ ! -s "$master" ]; then
+        echo "Master missing/empty -> using newfile as master: $master"
+        cp "$newfile" "$master"
+        return 0
+    fi
+
+    local tmp
+    tmp="$(mktemp)"
+
+    head -n 1 "$master" > "$tmp"
+    {
+        tail -n +2 "$master" || true
+        tail -n +2 "$newfile" || true
+    } | awk '!seen[$0]++' >> "$tmp"
+
+    mv "$tmp" "$master"
+}
+
+# Resolve the first existing file from explicit candidates, then from glob patterns.
+resolve_first_file() {
+    local dir="$1"
+    shift
+    local candidates=("$@")
+    local c
+
+    for c in "${candidates[@]}"; do
+        if [ -f "$dir/$c" ]; then
+            echo "$dir/$c"
+            return 0
+        fi
+    done
+
+    # Pattern fallbacks (candidate values that include *)
+    for c in "${candidates[@]}"; do
+        if [[ "$c" == *"*"* ]]; then
+            local found
+            found="$(find "$dir" -maxdepth 1 -type f -name "$c" | sort | head -n 1 || true)"
+            if [ -n "$found" ]; then
+                echo "$found"
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
+################################################################################
+# DB locations
+################################################################################
+# Storage (N-drive via SMB)
+PRIMERDB="Virologi/NGS/1-NGS-Analyser/1-Rutine/2-Resultater/SARS-CoV-2/6-SARS-CoV-2_NGS_Dashboard_DB/Primer_overview/primer_mismatches.csv"
+AMPLICONDB="Virologi/NGS/1-NGS-Analyser/1-Rutine/2-Resultater/SARS-CoV-2/6-SARS-CoV-2_NGS_Dashboard_DB/Amplikon_overview/depth_by_position.csv"
+
+# Server cache
+PRIMER_DATABASE_SERVER="$SARS_DATABASE/primer_mismatches.csv"
+AMPLICON_DATABASE_SERVER="$SARS_DATABASE/depth_by_position.csv"
+
+################################################################################
+# Prepare run dirs
+################################################################################
+mkdir -p "$HOME/$RUN"
+mkdir -p "$TMP_DIR"
+
+# Clean TMP on exit
+cleanup() {
+    echo "Cleaning up temporary data..."
+    nextflow clean -f >/dev/null 2>&1 || true
+    rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
+
+################################################################################
+# Copy fastq files from storage
+################################################################################
+echo "Copying fastq files from the N drive"
+smbclient "$SMB_HOST" -A "$SMB_AUTH" -D "$SMB_INPUT" <<EOF
+prompt OFF
+recurse ON
+lcd "$TMP_DIR"
+mget *
+EOF
+
+################################################################################
+# Locate sample dir & samplesheet
+################################################################################
+SAMPLEDIR=$(find "$TMP_DIR/$RUN" -type d -path "*X*/fastq_pass" -print -quit 2>/dev/null || true)
+SAMPLESHEET="/mnt/tempdata/fastq/${RUN}.csv"
+
+if [ -z "${SAMPLEDIR}" ]; then
+    echo "WARNING: Could not find fastq_pass directory under $TMP_DIR/$RUN"
+    echo "         SAMPLEDIR is empty; pipeline may fail unless this is expected."
+fi
+
+################################################################################
+# Update DB cache from storage (download)
+################################################################################
+echo "Updating DB cache from storage"
+download_db "$PRIMERDB"   "$SARS_DATABASE"
+download_db "$AMPLICONDB" "$SARS_DATABASE"
+
+################################################################################
+# TODO: Create samplesheet
+################################################################################
+# Create a samplesheet by running the supplied Rscript in a docker container.
+# ADD CODE FOR HANDLING OF SAMPLESHEET
+
+################################################################################
+# Validate primer dir and resolve files before pipeline run
+################################################################################
+if [ -z "${PRIMER}" ]; then
+    echo "ERROR: -p <primer> is required for this pipeline."
+    exit 1
+fi
+
+PRIMER_DIR="$SARS_DATABASE/$PRIMER"
+if [ ! -d "$PRIMER_DIR" ]; then
+    echo "ERROR: Primer directory does not exist: $PRIMER_DIR"
+    echo "Check the -p argument or make sure the primer directory is present."
+    exit 1
+fi
+
+# Prefer canonical names, then fallback globs.
+BED_LOCAL="$(resolve_first_file "$PRIMER_DIR" \
+    "SARS-CoV-2.scheme.bed" \
+    "ncov-2019_midnight.scheme.bed" \
+    "*.scheme.bed" \
+    "*.bed" || true)"
+
+REF_LOCAL="$(resolve_first_file "$PRIMER_DIR" \
+    "SARS-CoV-2.reference.fasta" \
+    "ncov-2019_midnight.reference.fasta" \
+    "*.reference.fasta" || true)"
+
+if [ -z "$BED_LOCAL" ] || [ ! -f "$BED_LOCAL" ]; then
+    echo "ERROR: Could not resolve primer BED file in $PRIMER_DIR"
+    echo "Expected one of: SARS-CoV-2.scheme.bed, *.scheme.bed, or *.bed"
+    exit 1
+fi
+
+if [ -z "$REF_LOCAL" ] || [ ! -f "$REF_LOCAL" ]; then
+    echo "ERROR: Could not resolve reference FASTA in $PRIMER_DIR"
+    echo "Expected one of: SARS-CoV-2.reference.fasta or *.reference.fasta"
+    exit 1
+fi
+
+echo "Using primer dir : $PRIMER_DIR"
+echo "Using primer bed : $BED_LOCAL"
+echo "Using reference  : $REF_LOCAL"
+
+################################################################################
+# Run Nextflow pipeline
+################################################################################
+# Fix for conda activation scripts that reference JAVA_HOME while set -u is active
+export JAVA_HOME="${JAVA_HOME:-}"
+
+# Temporarily disable nounset because some conda activate scripts break on unset vars
+set +u
+conda activate NEXTFLOW
+set -u
+
+echo "Map to references and create consensus sequences"
+nextflow pull RasmusKoRiis/nf-core-sars
+
+nextflow run RasmusKoRiis/nf-core-sars/main.nf \
+    -r master \
+    -profile docker,server \
+    --input "$SAMPLESHEET" \
+    --samplesDir "$SAMPLEDIR" \
+    --outdir "$HOME/$RUN" \
+    --primerdir "$PRIMER_DIR" \
+    --reference "$REF_LOCAL" \
+    --primer_bed "$BED_LOCAL" \
+    --runid "$RUN" \
+    --spike "$SARS_DATABASE/Spike_mAbs_inhibitors.csv" \
+    --rdrp "$SARS_DATABASE/RdRP_inhibitors.csv" \
+    --clpro "$SARS_DATABASE/3CLpro_inhibitors.csv" \
+    --release_version "v1.0.0"

@@ -10,7 +10,7 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir", "primer_bed"],
+            "required": ["input", "outdir"],
             "properties": {
                 "input": {
                     "type": "string",
@@ -52,7 +52,7 @@
                     "format": "file-path",
                     "exists": true,
                     "description": "Primer BED file used for ARTIC, depth analysis and primer QC.",
-                    "help_text": "Provide the BED file describing the primer scheme / amplicons that were used for the sequencing run. The file is passed to ARTIC, depth analysis and the primer mismatch QC."
+                    "help_text": "Optional when `--primerdir` contains the scheme file. If provided, this BED is used directly for ARTIC, depth analysis and primer mismatch QC."
                 },
                 "primer_fasta": {
                     "type": "string",

@@ -78,24 +78,46 @@ workflow SARSCOVSEQ() {
 
     main:
 
-    if( !params.primer_bed ) {
-        error "Parameter --primer_bed is required and must point to the BED file for the selected primer scheme."
-    }
-    if( !params.reference ) {
-        error "Parameter --reference is required and must point to the reference FASTA."
-    }
-
-    def primerBedFile = file(params.primer_bed)
-    if( !primerBedFile.exists() ) {
-        error "Primer BED file not found: ${params.primer_bed}"
-    }
-
-    def referenceFile = file(params.reference)
-    if( !referenceFile.exists() ) {
-        error "Reference FASTA file not found: ${params.reference}"
-    }
-
     def primerDirPath = params.primerdir ? file(params.primerdir) : null
+    def primerBedCandidates = []
+    if( params.primer_bed ) {
+        primerBedCandidates << file(params.primer_bed)
+    }
+    if( primerDirPath?.exists() ) {
+        def primerDirFiles = primerDirPath.toFile().listFiles() ?: []
+        primerBedCandidates << file("${params.primerdir}/SARS-CoV-2.scheme.bed")
+        primerBedCandidates << file("${params.primerdir}/ncov-2019_midnight.scheme.bed")
+        primerBedCandidates.addAll(primerDirFiles.findAll { it.name ==~ /.*\\.scheme\\.bed$/ })
+        primerBedCandidates.addAll(primerDirFiles.findAll { it.name ==~ /.*\\.bed$/ })
+    }
+    def primerBedCandidate = primerBedCandidates.find { it && it.exists() }
+    def primerBedFile = primerBedCandidate ? file(primerBedCandidate.toString()) : null
+    if( !primerBedFile ) {
+        error "Unable to locate primer BED file. Provide --primer_bed or place a .scheme.bed file inside --primerdir."
+    }
+    if( !primerBedFile.exists() ) {
+        error "Primer BED file not found: ${primerBedFile}"
+    }
+
+    def referenceCandidates = []
+    if( params.reference ) {
+        referenceCandidates << file(params.reference)
+    }
+    if( primerDirPath?.exists() ) {
+        def primerDirFiles = primerDirPath.toFile().listFiles() ?: []
+        referenceCandidates << file("${params.primerdir}/SARS-CoV-2.reference.fasta")
+        referenceCandidates << file("${params.primerdir}/ncov-2019_midnight.reference.fasta")
+        referenceCandidates.addAll(primerDirFiles.findAll { it.name ==~ /.*\\.reference\\.fasta$/ })
+    }
+    def referenceCandidate = referenceCandidates.find { it && it.exists() }
+    def referenceFile = referenceCandidate ? file(referenceCandidate.toString()) : null
+    if( !referenceFile ) {
+        error "Unable to locate reference FASTA. Provide --reference or place a *.reference.fasta inside --primerdir."
+    }
+    if( !referenceFile.exists() ) {
+        error "Reference FASTA file not found: ${referenceFile}"
+    }
+
     def primerFastaCandidates = []
     if( params.primer_fasta ) {
         def explicitPrimerFasta = file(params.primer_fasta)
