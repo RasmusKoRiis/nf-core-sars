@@ -58,28 +58,38 @@ Add an opt-in offline mode that keeps the current online behavior as the default
   - Deferred: strict `params.artic_model` layout validation, because ARTIC/Clair3 model directory layout should be confirmed on the server cache.
   - Done: current consensus, VCF, BAM, IUPAC, and `versions.yml` behavior is preserved.
 
-- [ ] Decide container offline strategy.
-  - Docker option: require all image tags to be pulled locally before running offline.
-  - Apptainer/Singularity option: provide a local image cache directory and configure `singularity.cacheDir` or use process-level local image paths.
-  - Recommended first implementation: Docker cached-image preflight in the wrapper, because the current wrapper uses `-profile docker,server`.
+- [x] Decide container offline strategy.
+  - Done: first implementation uses Docker cached-image preflight in the wrapper, because the current wrapper uses `-profile docker,server`.
+  - Done: `bin/prepare_offline_cache.sh` pulls the wrapper-required Docker images while online.
+  - Done: wrapper offline mode requires all wrapper-required image tags to be available locally before starting Nextflow.
+  - Future option: add Apptainer/Singularity cache support if the wrapper switches away from Docker.
 
-- [ ] Inventory required container images and pin unstable tags.
+- [ ] Pin unstable image tags.
   - Replace `latest` tags where possible, especially `docker.io/nextstrain/nextclade:latest` and `docker.io/cdcgov/irma:latest`.
-  - Current images to account for:
-    - `community.wave.seqera.io/library/artic:1.6.2--d4956cdc155b8612`
+  - This should be done as a separate tested change because it can alter tool versions and results.
+
+- [x] Inventory required container images.
+  - Done: wrapper-required images are listed in `wrapper-sars-wgs-fixed.sh` and `bin/prepare_offline_cache.sh`.
+  - Done: optional images for other modules/workflow modes are available via `bin/prepare_offline_cache.sh --include-optional-images`.
+  - Wrapper-required images:
+    - `quay.io/nf-core/ubuntu:20.04`
+    - `quay.io/biocontainers/chopper:0.9.0--hdcf5f25_0`
     - `quay.io/artic/fieldbioinformatics:1.6.0`
-    - `docker.io/nextstrain/nextclade:latest`
+    - `community.wave.seqera.io/library/artic:1.6.2--d4956cdc155b8612`
     - `docker.io/rasmuskriis/nextclade-python`
+    - `docker.io/nextstrain/nextclade:latest`
     - `docker.io/rasmuskriis/blast_python_pandas:amd64`
+  - Apptainer/Singularity option: provide a local image cache directory and configure `singularity.cacheDir` or use process-level local image paths.
+  - Optional non-wrapper images available through `--include-optional-images`:
     - `docker.io/cdcgov/irma:latest`
     - `community.wave.seqera.io/library/bcftools:1.22--a51ee80717c2467e`
     - `community.wave.seqera.io/library/bedtools_samtools:2932e857ecf6b5f2`
     - `community.wave.seqera.io/library/minimap2_samtools:33bb43c18d22e29c`
     - `community.wave.seqera.io/library/medaka:2.1.1--01dc988f451b713d`
-    - `bash:5.2`
-    - `quay.io/biocontainers/chopper:0.9.0--hdcf5f25_0`
+    - `docker.io/library/bash:5.2`
     - `quay.io/biocontainers/ampligone:1.3.1--pyhdfd78af_0`
-    - nf-core modules also resolve `ubuntu:20.04`, `fastqc:0.12.1--hdfd78af_0`, and `multiqc:1.21--pyhdfd78af_0` depending on container engine/profile.
+    - `quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0`
+    - `quay.io/biocontainers/multiqc:1.21--pyhdfd78af_0`
 
 - [x] Add wrapper offline option in `wrapper-sars-wgs-fixed.sh`.
   - Done: added `-o` to enable offline mode.
@@ -99,21 +109,27 @@ Add an opt-in offline mode that keeps the current online behavior as the default
   - Done: verifies required Docker images are present locally with `docker image inspect`.
   - Done: fails early with actionable messages instead of letting Nextflow fail deep into execution.
 
-- [ ] Decide how offline resources are installed or refreshed.
-  - Add a documented "prepare online cache" procedure.
-  - Download/cache the Nextclade dataset once while online.
-  - Download/cache ARTIC/Clair3 models once while online.
-  - Pull all required Docker images once while online.
-  - Run `nextflow plugin install nf-schema@2.5.1` or trigger one online run to populate the plugin cache.
-  - Pull/update the pipeline checkout while online.
+- [x] Add offline wrapper input overrides.
+  - Done: `--local-fastq-dir <dir>` uses a local FASTQ samples directory instead of copying FASTQs from the N-drive.
+  - Done: `--local-samplesheet <csv>` uses a local samplesheet instead of `/mnt/tempdata/fastq/<RUN>.csv`.
+  - Done: `--local-fasta <path-or-glob>` switches the wrapper to `fasta-workflow`.
+  - Done: FASTA workflow skips primer/ARTIC-specific wrapper validation and ARTIC model preflight.
+  - Done: local FASTQ/FASTA input paths are not removed by wrapper cleanup.
 
-- [ ] Add local resource defaults for the server.
-  - Decide standard server locations, for example under `/mnt/tempdata/sars_db/offline`.
-  - Proposed paths:
-    - Nextclade dataset: `/mnt/tempdata/sars_db/offline/nextclade/sars-cov-2-wuhan-hu-1-orfs`
-    - ARTIC models: `/mnt/tempdata/sars_db/offline/artic_models`
-    - Pipeline checkout: `$HOME/.nextflow/assets/RasmusKoRiis/nf-core-sars`
-  - Keep these configurable through environment variables or wrapper flags.
+- [x] Decide how offline resources are installed or refreshed.
+  - Done: added `bin/prepare_offline_cache.sh` as the online cache-preparation procedure.
+  - Done: script downloads/caches the Nextclade dataset once while online.
+  - Done: script downloads/caches ARTIC/Clair3 models once while online.
+  - Done: script pulls all wrapper-required Docker images once while online.
+  - Done: script runs `nextflow plugin install nf-schema@2.5.1`.
+  - Done: script runs `nextflow pull RasmusKoRiis/nf-core-sars -r <branch>`.
+
+- [x] Add local resource defaults for the server.
+  - Done: standard cache base defaults to `/mnt/tempdata/sars_db/assets/offline`.
+  - Done: Nextclade dataset defaults to `/mnt/tempdata/sars_db/assets/offline/nextclade/sars-cov-2-wuhan-hu-1-orfs`.
+  - Done: ARTIC models default to `/mnt/tempdata/sars_db/assets/offline/artic_models`.
+  - Done: pipeline checkout defaults to `$HOME/.nextflow/assets/RasmusKoRiis/nf-core-sars`.
+  - Done: paths are configurable through environment variables and cache-prep script flags.
 
 - [ ] Make the wrapper release/version behavior offline-safe.
   - Online mode: keep `-b <branch>` and `nextflow pull`.
@@ -127,12 +143,12 @@ Add an opt-in offline mode that keeps the current online behavior as the default
   - Add a wrapper dry-run/preflight test path, or a shellcheck-style validation if wrapper dry-run is not available.
   - Add a local stub workflow test with `--offline true` and local fake resource paths.
 
-- [ ] Add documentation.
-  - Document online default behavior.
-  - Document offline prerequisites.
-  - Document how to populate the offline cache while online.
-  - Document wrapper usage, for example `wrapper-sars-wgs-fixed.sh -o -r <RUN> -p <PRIMER> -a sars -y <YEAR>`.
-  - Document what offline mode does not cover if SMB/N-drive remains required.
+- [x] Add documentation.
+  - Done: added `docs/offline-cache.md`.
+  - Done: documented online cache preparation.
+  - Done: documented wrapper offline usage and path overrides.
+  - Done: documented wrapper preflight checks.
+  - Remaining clarification: decide and document whether SMB/N-drive access counts as "offline" or not.
 
 - [ ] Verification checklist before calling offline mode done.
   - Run online mode unchanged.
@@ -148,8 +164,8 @@ Add an opt-in offline mode that keeps the current online behavior as the default
 3. Done: patch `ARTIC_MINION_M` to use a local model directory in offline mode.
 4. Done: add wrapper `-o` flag, local pipeline launch, `NXF_OFFLINE=true`, and offline parameter passing.
 5. Done: add wrapper offline preflight checks.
-6. Next: pin or document all required container images and add a cache-preparation procedure.
-7. Run online regression, then offline end-to-end validation.
+6. Done: document all required container images and add a cache-preparation procedure.
+7. Next: run online regression, then offline end-to-end validation.
 
 ## Implementation Log
 
@@ -159,3 +175,5 @@ Add an opt-in offline mode that keeps the current online behavior as the default
 - 2026-04-27: Updated `ARTIC_MINION_M` to use a staged local ARTIC/Clair3 model directory in offline mode.
 - 2026-04-27: Validation performed with FASTA stub runs in normal and offline modes. Direct ARTIC stub command generation was checked, but local execution is blocked by the existing 12-CPU `process_high` label on this 8-CPU host.
 - 2026-04-27: Added wrapper `-o` offline mode, local pipeline launch, `NXF_OFFLINE=true`, offline resource parameter passing, and preflight checks for cached plugin/resources/Docker images.
+- 2026-04-27: Added `bin/prepare_offline_cache.sh` and `docs/offline-cache.md` to populate/document the offline cache while online.
+- 2026-04-27: Added wrapper local input overrides for offline/local FASTQ and FASTA runs.
