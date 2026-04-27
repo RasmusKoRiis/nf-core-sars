@@ -42,7 +42,7 @@ process NEXTCLADE {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        nextclade: \$(nextclade --version 2>&1 | sed -E 's/^[^0-9]*([0-9].*)$/\\1/')
+        nextclade: \$(nextclade --version 2>&1 | sed -E 's/^[^0-9]*([0-9].*)\$/\\1/')
     END_VERSIONS
     """
 
