@@ -8,6 +8,7 @@ process NEXTCLADE {
 
     input:
     tuple val(meta), path(fasta)
+    path local_dataset
 
     output:
     tuple val(meta), path("${meta.id}_nextclade.csv"), emit: nextclade_csv, optional: true
@@ -17,15 +18,31 @@ process NEXTCLADE {
     task.ext.when == null || task.ext.when
 
     script:
+    def offlineMode = params.offline.toString().toBoolean()
+    def datasetSetup = offlineMode
+        ? """
+    dataset_dir="${local_dataset}"
+    if [[ ! -d "\${dataset_dir}" ]]; then
+        echo "ERROR: Offline Nextclade dataset directory is missing: \${dataset_dir}" >&2
+        exit 2
+    fi
+    if [[ "\$(find "\${dataset_dir}" -mindepth 1 -maxdepth 1 | wc -l)" -eq 0 ]]; then
+        echo "ERROR: Offline Nextclade dataset directory is empty: \${dataset_dir}" >&2
+        exit 2
+    fi
+    """
+        : """
+    dataset_dir="${meta.id}_nextclade_dataset"
+
+    nextclade dataset get \\
+        --name 'nextstrain/sars-cov-2/wuhan-hu-1/orfs' \\
+        --output-dir "\${dataset_dir}"
+    """
     """
     set -euo pipefail
 
-    dataset_dir="${meta.id}_nextclade_dataset"
+    ${datasetSetup}
     output_dir="${meta.id}_nextclade_output"
-
-    nextclade dataset get \
-        --name 'nextstrain/sars-cov-2/wuhan-hu-1/orfs' \
-        --output-dir "\${dataset_dir}"
 
     nextclade run \
         --input-dataset "\${dataset_dir}" \

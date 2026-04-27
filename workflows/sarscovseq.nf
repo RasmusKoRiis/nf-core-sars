@@ -33,6 +33,20 @@ def resolveRequiredFile(pathValue, label) {
     return resolved
 }
 
+def resolveRequiredDirectory(pathValue, label) {
+    if (!pathValue) {
+        error "${label} was not provided."
+    }
+    def resolved = file(pathValue)
+    if (!resolved.exists()) {
+        error "${label} not found: ${pathValue}"
+    }
+    if (!resolved.toFile().isDirectory()) {
+        error "${label} is not a directory: ${pathValue}"
+    }
+    return resolved
+}
+
 def collectSampleFastqs(samplesDirPath, barcode) {
     def barcodeDir = new File(samplesDirPath.toString(), barcode)
     if (!barcodeDir.exists() || !barcodeDir.isDirectory()) {
@@ -98,6 +112,9 @@ workflow SARSCOVSEQ {
     def spikeTable = resolveRequiredFile(params.spike, 'Spike resistance lookup table')
     def rdrpTable = resolveRequiredFile(params.rdrp, 'RdRp resistance lookup table')
     def clproTable = resolveRequiredFile(params.clpro, '3CLpro resistance lookup table')
+    def offlineMode = params.offline.toString().toBoolean()
+    def nextcladeDataset = offlineMode ? resolveRequiredDirectory(params.nextclade_dataset, 'Nextclade dataset directory') : []
+    def articModelDir = offlineMode ? resolveRequiredDirectory(params.artic_model_dir, 'ARTIC model directory') : []
 
     def primerDirPath = params.primerdir ? file(params.primerdir) : null
 
@@ -189,7 +206,8 @@ workflow SARSCOVSEQ {
     ARTIC_MINION_M(
         ARTIC_GUPPYPLEX.out.gp_fastq,
         Channel.value(primerBedFile),
-        Channel.value(referenceFile)
+        Channel.value(referenceFile),
+        Channel.value(articModelDir)
     )
 
     DEPTH_ANALYSIS(
@@ -203,7 +221,10 @@ workflow SARSCOVSEQ {
         Channel.value(params.runid)
     )
 
-    NEXTCLADE(ARTIC_MINION_M.out.artic_consensus)
+    NEXTCLADE(
+        ARTIC_MINION_M.out.artic_consensus,
+        Channel.value(nextcladeDataset)
+    )
 
     CSV_CONVERSION(NEXTCLADE.out.nextclade_csv)
 

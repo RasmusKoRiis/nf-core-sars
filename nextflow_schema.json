@@ -317,6 +317,16 @@
                     "enum": ["fastq-workflow", "fasta-workflow", "primercheck-workflow"],
                     "description": "Workflow mode to execute."
                 },
+                "offline": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run without internet-dependent runtime downloads. Requires local cached resources such as the Nextclade dataset, ARTIC models, Nextflow plugins, and container images."
+                },
+                "nextclade_dataset": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Local pre-downloaded Nextclade dataset directory. Required when --offline true is used with workflows that run Nextclade."
+                },
                 "min_depth": {
                     "type": "integer",
                     "default": 30,
@@ -356,6 +366,11 @@
                     "type": "string",
                     "default": "r1041_e82_400bps_hac_v430",
                     "description": "ARTIC basecalling model label used in the consensus workflow."
+                },
+                "artic_model_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Local pre-downloaded ARTIC/Clair3 model directory. Required when --offline true is used with the FASTQ workflow."
                 },
                 "artic_iupac_min_af": {
                     "type": "number",

@@ -37,6 +37,20 @@ def resolveRequiredFile(pathValue, label) {
     return resolved
 }
 
+def resolveRequiredDirectory(pathValue, label) {
+    if (!pathValue) {
+        error "${label} was not provided."
+    }
+    def resolved = file(pathValue)
+    if (!resolved.exists()) {
+        error "${label} not found: ${pathValue}"
+    }
+    if (!resolved.toFile().isDirectory()) {
+        error "${label} is not a directory: ${pathValue}"
+    }
+    return resolved
+}
+
 def toPathList(paths) {
     paths instanceof List ? paths : [paths]
 }
@@ -54,6 +68,8 @@ workflow SARSCOVSEQFASTA {
     def spikeTable = resolveRequiredFile(params.spike, 'Spike resistance lookup table')
     def rdrpTable = resolveRequiredFile(params.rdrp, 'RdRp resistance lookup table')
     def clproTable = resolveRequiredFile(params.clpro, '3CLpro resistance lookup table')
+    def offlineMode = params.offline.toString().toBoolean()
+    def nextcladeDataset = offlineMode ? resolveRequiredDirectory(params.nextclade_dataset, 'Nextclade dataset directory') : []
 
     ch_fasta_raw = parseFastaInputs(fastaPattern)
 
@@ -66,7 +82,10 @@ workflow SARSCOVSEQFASTA {
             }
         }
 
-    NEXTCLADE(ch_single_seq)
+    NEXTCLADE(
+        ch_single_seq,
+        Channel.value(nextcladeDataset)
+    )
 
     CSV_CONVERSION(NEXTCLADE.out.nextclade_csv)
 

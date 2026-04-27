@@ -9,6 +9,7 @@ process ARTIC_MINION_M {
     tuple val(meta), path(gp_fastq)
     path  bed
     path  ref
+    path  local_model_dir
 
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
@@ -29,6 +30,20 @@ process ARTIC_MINION_M {
   def AMBIGMIN = params.artic_iupac_min_af.toString()
   def AMBIGMAX = params.artic_iupac_max_af.toString()
   def MINDEPTH = params.min_depth.toString()
+  def OFFLINE = params.offline.toString().toBoolean()
+  def MODEL_SETUP = OFFLINE
+    ? '''
+# Use pre-downloaded ARTIC/Clair3 models in offline mode.
+MODELDIR="__ARTIC_MODEL_DIR__"
+[ -d "$MODELDIR" ] || { echo "ERROR: Offline ARTIC model directory is missing: $MODELDIR"; exit 2; }
+[ "$(find "$MODELDIR" -mindepth 1 -maxdepth 1 | wc -l)" -gt 0 ] || { echo "ERROR: Offline ARTIC model directory is empty: $MODELDIR"; exit 2; }
+'''
+    : '''
+# Clair3 models (best effort)
+MODELDIR="$PWD/clair3_models"
+mkdir -p "$MODELDIR"
+artic_get_models --model-dir "$MODELDIR" || true
+'''
 
   def cmd = '''
 set -euo pipefail
@@ -51,10 +66,7 @@ awk -F'\\t' '
   { print "ERROR: Unsupported BED line with " NF " columns: " $0 > "/dev/stderr"; exit 11 }
 ' "__BED__" > "$BED7"
 
-# Clair3 models (best effort)
-MODELDIR="$PWD/clair3_models"
-mkdir -p "$MODELDIR"
-artic_get_models --model-dir "$MODELDIR" || true
+__MODEL_SETUP__
 
 # Run ARTIC
 artic minion \
@@ -356,6 +368,8 @@ END_VERSIONS
     .replace('__AMBIGMAX__', AMBIGMAX)
     .replace('__MINDEPTH__', MINDEPTH)
     .replace('__TASK_PROCESS__', task.process.toString())
+    .replace('__ARTIC_MODEL_DIR__', OFFLINE ? local_model_dir.toString() : '')
+    .replace('__MODEL_SETUP__', MODEL_SETUP)
     .replace('__MODELOPT__', MODELOPT)
 
   return cmd
