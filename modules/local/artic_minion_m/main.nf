@@ -339,7 +339,7 @@ echo "Final header:"
 grep -m1 '^>' "__METAID__.consensus.fasta" || true
 
 cat <<-END_VERSIONS > versions.yml
-"${task.process}":
+"__TASK_PROCESS__":
     artic: $(artic --version 2>&1 | head -n 1)
     samtools: $(samtools --version 2>&1 | head -n 1 | sed 's/^samtools //')
 END_VERSIONS
@@ -355,6 +355,7 @@ END_VERSIONS
     .replace('__AMBIGMIN__', AMBIGMIN)
     .replace('__AMBIGMAX__', AMBIGMAX)
     .replace('__MINDEPTH__', MINDEPTH)
+    .replace('__TASK_PROCESS__', task.process.toString())
     .replace('__MODELOPT__', MODELOPT)
 
   return cmd
