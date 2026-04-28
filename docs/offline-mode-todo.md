@@ -152,7 +152,9 @@ Add an opt-in offline mode that keeps the current online behavior as the default
 
 - [x] Add documentation.
   - Done: added `docs/offline-cache.md`.
+  - Done: added `docs/offline-harddrive-install.md`.
   - Done: documented online cache preparation.
+  - Done: documented portable harddrive bundle creation and offline computer setup.
   - Done: documented wrapper offline usage and path overrides.
   - Done: documented wrapper preflight checks.
   - Remaining clarification: decide and document whether SMB/N-drive access counts as "offline" or not.
@@ -186,3 +188,4 @@ Add an opt-in offline mode that keeps the current online behavior as the default
 - 2026-04-27: Added wrapper local input overrides for offline/local FASTQ and FASTA runs.
 - 2026-04-27: Added wrapper fallback from `/mnt/tempdata/sars_db/assets` to `$PIPELINE_DIR/assets` for lookup tables and primer resources.
 - 2026-04-27: Added final report `Version Control Metadata` column for both FASTQ and FASTA workflows.
+- 2026-04-28: Added `bin/create_offline_harddrive_bundle.sh` and `docs/offline-harddrive-install.md` for portable offline installations.

@@ -226,8 +226,9 @@ fi
 if [ "$PLUGIN_ENABLED" = true ]; then
     log "Caching Nextflow plugin"
     "$NEXTFLOW_BIN" plugin install "$PLUGIN_ID"
-    if ! find "$HOME/.nextflow/plugins" -maxdepth 4 -iname "*${PLUGIN_ID%@*}*${PLUGIN_ID#*@}*" 2>/dev/null | grep -q .; then
-        echo "WARNING: Could not verify $PLUGIN_ID in $HOME/.nextflow/plugins after install."
+    nextflow_plugin_dir="${NXF_HOME:-$HOME/.nextflow}/plugins"
+    if ! find "$nextflow_plugin_dir" -maxdepth 4 -iname "*${PLUGIN_ID%@*}*${PLUGIN_ID#*@}*" 2>/dev/null | grep -q .; then
+        echo "WARNING: Could not verify $PLUGIN_ID in $nextflow_plugin_dir after install."
         echo "The wrapper offline preflight will still check for this before running."
     fi
 fi

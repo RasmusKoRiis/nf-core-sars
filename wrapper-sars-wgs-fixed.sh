@@ -2,7 +2,16 @@
 set -euo pipefail
 
 # Activate conda base functions
-source ~/miniconda3/etc/profile.d/conda.sh
+CONDA_PROFILE="${CONDA_PROFILE:-$HOME/miniconda3/etc/profile.d/conda.sh}"
+if [ -f "$CONDA_PROFILE" ]; then
+    source "$CONDA_PROFILE"
+elif command -v conda >/dev/null 2>&1; then
+    eval "$(conda shell.bash hook)"
+else
+    echo "ERROR: Could not initialize conda."
+    echo "Set CONDA_PROFILE=/path/to/conda.sh or make conda available in PATH."
+    exit 1
+fi
 
 # Maintained by: Rasmus Kopperud Riis (rasmuskopperud.riis@fhi.no)
 # Version: dev
@@ -34,6 +43,7 @@ usage() {
     echo "  OFFLINE_NEXTCLADE_DATASET    Local Nextclade dataset directory"
     echo "  OFFLINE_ARTIC_MODEL_DIR      Local ARTIC/Clair3 model directory"
     echo "  PIPELINE_ASSETS_DIR          Local assets fallback (default: PIPELINE_DIR/assets, then wrapper assets)"
+    echo "  CONDA_PROFILE                Conda profile script if not \$HOME/miniconda3/etc/profile.d/conda.sh"
     exit 1
 }
 
@@ -398,8 +408,10 @@ preflight_offline_mode() {
     require_file "$RDRP_TABLE" "RdRP lookup table"
     require_file "$CLPRO_TABLE" "3CLpro lookup table"
 
-    if ! find "$HOME/.nextflow/plugins" -maxdepth 4 -iname '*nf-schema*2.5.1*' 2>/dev/null | grep -q .; then
+    local nextflow_plugin_dir="${NXF_HOME:-$HOME/.nextflow}/plugins"
+    if ! find "$nextflow_plugin_dir" -maxdepth 4 -iname '*nf-schema*2.5.1*' 2>/dev/null | grep -q .; then
         echo "ERROR: nf-schema@2.5.1 was not found in the local Nextflow plugin cache."
+        echo "Checked: $nextflow_plugin_dir"
         echo "Run the pipeline once online, or install/cache nf-schema@2.5.1 before offline use."
         exit 1
     fi

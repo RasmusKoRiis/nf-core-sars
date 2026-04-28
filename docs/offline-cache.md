@@ -10,6 +10,14 @@ From the pipeline repository:
 bin/prepare_offline_cache.sh
 ```
 
+For a portable harddrive installation, prefer:
+
+```bash
+bin/create_offline_harddrive_bundle.sh --bundle-dir /media/$USER/SARS_OFFLINE
+```
+
+See [Offline harddrive installation](offline-harddrive-install.md).
+
 By default this populates:
 
 ```text
