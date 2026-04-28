@@ -15,6 +15,8 @@ process REPORT {
     path(samplesheet)
     val primer
     path(fasta)
+    path(tool_versions, stageAs: 'tool_versions/version_??.yml')
+    val version_control_metadata
     
     output:
     path("${runid}.csv"), emit: report
@@ -61,8 +63,66 @@ process REPORT {
     # Add Release Version column
     awk -v version="${release_version}" -v OFS=',' '{ if (NR == 1) { print \$0, "Release Version" } else { print \$0, version } }' ${runid}_temp4.csv > ${runid}_temp5.csv
 
+    cat > version_control_static.txt <<'END_STATIC_VERSION_CONTROL_METADATA'
+    ${version_control_metadata}
+    END_STATIC_VERSION_CONTROL_METADATA
+
+    python3 - version_control_static.txt tool_versions/* > version_control_metadata.txt <<'PY'
+    import sys
+
+    static_path = sys.argv[1]
+    version_files = sys.argv[2:]
+
+    parts = []
+    with open(static_path) as fh:
+        static_metadata = " ".join(line.strip() for line in fh if line.strip())
+    if static_metadata:
+        parts.append(static_metadata)
+
+    process = None
+    for path in version_files:
+        try:
+            lines = open(path)
+        except OSError:
+            continue
+        with lines:
+            for raw_line in lines:
+                line = raw_line.rstrip()
+                stripped = line.strip()
+                if stripped.endswith(":") and line == stripped:
+                    process = stripped[:-1].strip('"').strip("'")
+                    continue
+                if process and line[:1].isspace() and ":" in stripped:
+                    tool, version = stripped.split(":", 1)
+                    tool = tool.strip().strip('"').strip("'")
+                    version = version.strip().strip('"').strip("'")
+                    if tool and version:
+                        parts.append(f"{process}.{tool}={version}")
+
+    report_python = sys.version.split()[0]
+    parts.append(f"REPORT.python={report_python}")
+    print("; ".join(parts))
+    PY
+
+    python3 - ${runid}_temp5.csv version_control_metadata.txt ${runid}_temp6.csv <<'PY'
+    import csv
+    import sys
+
+    in_csv, metadata_path, out_csv = sys.argv[1:]
+    with open(metadata_path) as fh:
+        metadata = fh.read().strip()
+
+    with open(in_csv, newline="") as in_fh, open(out_csv, "w", newline="") as out_fh:
+        reader = csv.reader(in_fh)
+        writer = csv.writer(out_fh)
+        header = next(reader)
+        writer.writerow(header + ["Version Control Metadata"])
+        for row in reader:
+            writer.writerow(row + [metadata])
+    PY
+
     # QC calculations
-    python /project-bin/report_QC_calculation.py ${runid}_temp5.csv -o ${runid}.csv
+    python /project-bin/report_QC_calculation.py ${runid}_temp6.csv -o ${runid}.csv
 
     # Make Multiple FASTA file for all samples
     cat ${fasta} > ${runid}.fasta
@@ -76,8 +136,8 @@ process REPORT {
     stub:
     """
     cat <<EOF > ${runid}.csv
-    Sample,RunID,Release Version
-    sample1,${runid},${release_version}
+    Sample,RunID,Release Version,Version Control Metadata
+    sample1,${runid},${release_version},${version_control_metadata}; REPORT.python=stub
     EOF
 
     cat <<EOF > ${runid}.fasta

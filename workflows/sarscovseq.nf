@@ -115,6 +115,14 @@ workflow SARSCOVSEQ {
     def offlineMode = params.offline.toString().toBoolean()
     def nextcladeDataset = offlineMode ? resolveRequiredDirectory(params.nextclade_dataset, 'Nextclade dataset directory') : []
     def articModelDir = offlineMode ? resolveRequiredDirectory(params.artic_model_dir, 'ARTIC model directory') : []
+    def reportVersionControlMetadata = [
+        "pipeline=${workflow.manifest.name ?: 'nf-core-sars'}",
+        "pipeline_version=${workflow.manifest.version ?: 'unknown'}",
+        "nextflow=${workflow.nextflow.version}",
+        "offline=${offlineMode}",
+        "container_engine=${workflow.containerEngine ?: 'unknown'}",
+        "docker_images=quay.io/nf-core/ubuntu:20.04|quay.io/biocontainers/chopper:0.9.0--hdcf5f25_0|quay.io/artic/fieldbioinformatics:1.6.0|community.wave.seqera.io/library/artic:1.6.2--d4956cdc155b8612|docker.io/rasmuskriis/nextclade-python|docker.io/nextstrain/nextclade:latest|docker.io/rasmuskriis/blast_python_pandas:amd64"
+    ].join('; ')
 
     def primerDirPath = params.primerdir ? file(params.primerdir) : null
 
@@ -235,6 +243,17 @@ workflow SARSCOVSEQ {
         Channel.value(clproTable)
     )
 
+    ch_report_tool_versions = BUILD_PRIMER_DB.out.versions
+        .mix(CAT_FASTQ.out.versions)
+        .mix(CHOPPER.out.versions)
+        .mix(ARTIC_GUPPYPLEX.out.versions)
+        .mix(ARTIC_MINION_M.out.versions)
+        .mix(DEPTH_ANALYSIS.out.versions)
+        .mix(PRIMER_MISMATCH.out.versions)
+        .mix(NEXTCLADE.out.versions)
+        .mix(CSV_CONVERSION.out.versions)
+        .mix(TABLELOOKUP.out.versions)
+
     REPORT(
         CSV_CONVERSION.out.nextclade_stats_report.collect(),
         CSV_CONVERSION.out.nextclade_mutations_report.collect(),
@@ -244,6 +263,8 @@ workflow SARSCOVSEQ {
         params.seq_instrument,
         Channel.value(sampleSheetFile),
         primerDisplayPath,
-        ARTIC_MINION_M.out.artic_consensus_report.collect()
+        ARTIC_MINION_M.out.artic_consensus_report.collect(),
+        ch_report_tool_versions.collect(),
+        reportVersionControlMetadata
     )
 }

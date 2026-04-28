@@ -70,6 +70,14 @@ workflow SARSCOVSEQFASTA {
     def clproTable = resolveRequiredFile(params.clpro, '3CLpro resistance lookup table')
     def offlineMode = params.offline.toString().toBoolean()
     def nextcladeDataset = offlineMode ? resolveRequiredDirectory(params.nextclade_dataset, 'Nextclade dataset directory') : []
+    def reportVersionControlMetadata = [
+        "pipeline=${workflow.manifest.name ?: 'nf-core-sars'}",
+        "pipeline_version=${workflow.manifest.version ?: 'unknown'}",
+        "nextflow=${workflow.nextflow.version}",
+        "offline=${offlineMode}",
+        "container_engine=${workflow.containerEngine ?: 'unknown'}",
+        "docker_images=docker.io/rasmuskriis/nextclade-python|docker.io/nextstrain/nextclade:latest|docker.io/rasmuskriis/blast_python_pandas:amd64"
+    ].join('; ')
 
     ch_fasta_raw = parseFastaInputs(fastaPattern)
 
@@ -96,10 +104,17 @@ workflow SARSCOVSEQFASTA {
         Channel.value(clproTable)
     )
 
+    ch_report_tool_versions = SPLIT_FASTA.out.versions
+        .mix(NEXTCLADE.out.versions)
+        .mix(CSV_CONVERSION.out.versions)
+        .mix(TABLELOOKUP.out.versions)
+
     REPORTFASTA(
         CSV_CONVERSION.out.nextclade_stats_report.collect(),
         CSV_CONVERSION.out.nextclade_mutations_report.collect(),
         TABLELOOKUP.out.resistance_mutations_report.collect(),
-        params.runid
+        params.runid,
+        ch_report_tool_versions.collect(),
+        reportVersionControlMetadata
     )
 }

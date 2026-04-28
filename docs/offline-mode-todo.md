@@ -116,6 +116,12 @@ Add an opt-in offline mode that keeps the current online behavior as the default
   - Done: FASTA workflow skips primer/ARTIC-specific wrapper validation and ARTIC model preflight.
   - Done: local FASTQ/FASTA input paths are not removed by wrapper cleanup.
 
+- [x] Add repo asset fallback for offline resources.
+  - Done: mutation lookup tables resolve from `/mnt/tempdata/sars_db/assets` first and `$PIPELINE_DIR/assets` second.
+  - Done: primer directories resolve from `/mnt/tempdata/sars_db/assets/<PRIMER>` first and `$PIPELINE_DIR/assets/<PRIMER>` second.
+  - Done: resolved lookup table paths are passed to Nextflow.
+  - Done: documented `PIPELINE_ASSETS_DIR` override.
+
 - [x] Decide how offline resources are installed or refreshed.
   - Done: added `bin/prepare_offline_cache.sh` as the online cache-preparation procedure.
   - Done: script downloads/caches the Nextclade dataset once while online.
@@ -136,6 +142,7 @@ Add an opt-in offline mode that keeps the current online behavior as the default
   - Offline mode: treat `-b <branch>` as informational unless the local checkout can be verified at that branch/tag.
   - Consider logging the local Git commit if the local pipeline directory is a Git repository.
   - Ensure `--release_version` reflects the offline pipeline version actually used.
+  - Done: final FASTQ and FASTA reports now include a `Version Control Metadata` column with pipeline/Nextflow/offline mode, Docker image tags, and upstream process tool versions.
 
 - [ ] Add tests.
   - Add module-level tests for `NEXTCLADE` online/offline command generation if practical.
@@ -177,3 +184,5 @@ Add an opt-in offline mode that keeps the current online behavior as the default
 - 2026-04-27: Added wrapper `-o` offline mode, local pipeline launch, `NXF_OFFLINE=true`, offline resource parameter passing, and preflight checks for cached plugin/resources/Docker images.
 - 2026-04-27: Added `bin/prepare_offline_cache.sh` and `docs/offline-cache.md` to populate/document the offline cache while online.
 - 2026-04-27: Added wrapper local input overrides for offline/local FASTQ and FASTA runs.
+- 2026-04-27: Added wrapper fallback from `/mnt/tempdata/sars_db/assets` to `$PIPELINE_DIR/assets` for lookup tables and primer resources.
+- 2026-04-27: Added final report `Version Control Metadata` column for both FASTQ and FASTA workflows.

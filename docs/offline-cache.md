@@ -41,6 +41,31 @@ OFFLINE_ARTIC_MODEL_DIR="/mnt/tempdata/sars_db/assets/offline/artic_models" \
 ./wrapper-sars-wgs-fixed.sh -o -r <RUN> -p <PRIMER> -a sars -y <YEAR>
 ```
 
+## Repo Asset Fallback
+
+The wrapper uses `/mnt/tempdata/sars_db/assets` first for primer resources and mutation lookup tables. If a file or primer folder is missing there, it falls back to local pipeline assets:
+
+```text
+$PIPELINE_DIR/assets, then the assets/ directory next to wrapper-sars-wgs-fixed.sh
+```
+
+This means offline mode can still use bundled repo resources such as:
+
+```text
+assets/Spike_mAbs_inhibitors.csv
+assets/RdRP_inhibitors.csv
+assets/3CLpro_inhibitors.csv
+assets/V5.4.2/
+assets/VMIDT.2/
+assets/primer_schemes/ncov-2019_midnight/v3.0.0/
+```
+
+If your local repo assets are somewhere else, override:
+
+```bash
+PIPELINE_ASSETS_DIR="/path/to/nf-core-sars/assets"
+```
+
 ## Local Input Overrides
 
 Offline mode can use local input paths instead of copying FASTQs from the N-drive.
@@ -88,7 +113,7 @@ The wrapper preflight checks:
 - local pipeline checkout
 - samplesheet and FASTQ sample directory for FASTQ workflow runs
 - local FASTA input for FASTA workflow runs
-- primer directory, BED, reference FASTA, and lookup tables for FASTQ workflow runs
+- primer directory, BED, reference FASTA, and lookup tables from either `/mnt/tempdata/sars_db/assets` or `$PIPELINE_DIR/assets`
 - local Nextclade dataset
 - local ARTIC/Clair3 model directory for FASTQ workflow runs
 - cached `nf-schema@2.5.1`

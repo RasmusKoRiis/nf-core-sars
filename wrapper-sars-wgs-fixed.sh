@@ -8,6 +8,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 # Version: dev
 
 SCRIPT_NAME=$(basename "$0")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -32,6 +33,7 @@ usage() {
     echo "  PIPELINE_DIR                 Local pipeline checkout (default: \$HOME/.nextflow/assets/RasmusKoRiis/nf-core-sars)"
     echo "  OFFLINE_NEXTCLADE_DATASET    Local Nextclade dataset directory"
     echo "  OFFLINE_ARTIC_MODEL_DIR      Local ARTIC/Clair3 model directory"
+    echo "  PIPELINE_ASSETS_DIR          Local assets fallback (default: PIPELINE_DIR/assets, then wrapper assets)"
     exit 1
 }
 
@@ -163,6 +165,13 @@ fi
 ################################################################################
 SARS_DATABASE="/mnt/tempdata/sars_db/assets"
 mkdir -p "$SARS_DATABASE"
+if [ -z "${PIPELINE_ASSETS_DIR:-}" ]; then
+    if [ -d "$PIPELINE_DIR/assets" ]; then
+        PIPELINE_ASSETS_DIR="$PIPELINE_DIR/assets"
+    else
+        PIPELINE_ASSETS_DIR="$SCRIPT_DIR/assets"
+    fi
+fi
 OFFLINE_BASE="${OFFLINE_BASE:-$SARS_DATABASE/offline}"
 OFFLINE_NEXTCLADE_DATASET="${OFFLINE_NEXTCLADE_DATASET:-$OFFLINE_BASE/nextclade/sars-cov-2-wuhan-hu-1-orfs}"
 OFFLINE_ARTIC_MODEL_DIR="${OFFLINE_ARTIC_MODEL_DIR:-$OFFLINE_BASE/artic_models}"
@@ -323,6 +332,52 @@ require_path_or_glob() {
     exit 1
 }
 
+resolve_asset_file() {
+    local relative_path="$1"
+    local label="$2"
+    local server_path="$SARS_DATABASE/$relative_path"
+    local repo_path="$PIPELINE_ASSETS_DIR/$relative_path"
+
+    if [ -f "$server_path" ]; then
+        echo "$server_path"
+        return 0
+    fi
+    if [ -f "$repo_path" ]; then
+        echo "$repo_path"
+        return 0
+    fi
+
+    echo "ERROR: $label not found in server cache or repo assets:" >&2
+    echo "  - $server_path" >&2
+    echo "  - $repo_path" >&2
+    exit 1
+}
+
+resolve_asset_dir() {
+    local relative_path="$1"
+    local label="$2"
+    local server_path="$SARS_DATABASE/$relative_path"
+    local repo_path="$PIPELINE_ASSETS_DIR/$relative_path"
+
+    if [ -d "$server_path" ]; then
+        echo "$server_path"
+        return 0
+    fi
+    if [ -d "$repo_path" ]; then
+        echo "$repo_path"
+        return 0
+    fi
+
+    echo "ERROR: $label not found in server cache or repo assets:" >&2
+    echo "  - $server_path" >&2
+    echo "  - $repo_path" >&2
+    exit 1
+}
+
+SPIKE_TABLE="$(resolve_asset_file "Spike_mAbs_inhibitors.csv" "Spike lookup table")"
+RDRP_TABLE="$(resolve_asset_file "RdRP_inhibitors.csv" "RdRP lookup table")"
+CLPRO_TABLE="$(resolve_asset_file "3CLpro_inhibitors.csv" "3CLpro lookup table")"
+
 preflight_offline_mode() {
     echo "Running offline preflight checks"
 
@@ -339,9 +394,9 @@ preflight_offline_mode() {
         require_nonempty_dir "$OFFLINE_ARTIC_MODEL_DIR" "Offline ARTIC model directory"
     fi
     require_nonempty_dir "$OFFLINE_NEXTCLADE_DATASET" "Offline Nextclade dataset directory"
-    require_file "$SARS_DATABASE/Spike_mAbs_inhibitors.csv" "Spike lookup table"
-    require_file "$SARS_DATABASE/RdRP_inhibitors.csv" "RdRP lookup table"
-    require_file "$SARS_DATABASE/3CLpro_inhibitors.csv" "3CLpro lookup table"
+    require_file "$SPIKE_TABLE" "Spike lookup table"
+    require_file "$RDRP_TABLE" "RdRP lookup table"
+    require_file "$CLPRO_TABLE" "3CLpro lookup table"
 
     if ! find "$HOME/.nextflow/plugins" -maxdepth 4 -iname '*nf-schema*2.5.1*' 2>/dev/null | grep -q .; then
         echo "ERROR: nf-schema@2.5.1 was not found in the local Nextflow plugin cache."
@@ -441,6 +496,9 @@ fi
 echo "Pipeline input FASTQ dir : ${SAMPLEDIR:-}"
 echo "Pipeline input samplesheet: ${SAMPLESHEET:-}"
 echo "Pipeline input FASTA     : ${LOCAL_FASTA:-}"
+echo "Spike lookup table       : $SPIKE_TABLE"
+echo "RdRP lookup table        : $RDRP_TABLE"
+echo "3CLpro lookup table      : $CLPRO_TABLE"
 
 ################################################################################
 # Update DB cache from storage (download)
@@ -468,12 +526,7 @@ if [ "$PIPELINE_FILE" = "fastq-workflow" ] && [ -z "${PRIMER}" ]; then
 fi
 
 if [ "$PIPELINE_FILE" = "fastq-workflow" ]; then
-    PRIMER_DIR="$SARS_DATABASE/$PRIMER"
-    if [ ! -d "$PRIMER_DIR" ]; then
-        echo "ERROR: Primer directory does not exist: $PRIMER_DIR"
-        echo "Check the -p argument or make sure the primer directory is present."
-        exit 1
-    fi
+    PRIMER_DIR="$(resolve_asset_dir "$PRIMER" "Primer directory")"
 
     # Prefer canonical names, then fallback globs.
     BED_LOCAL="$(resolve_first_file "$PRIMER_DIR" \
@@ -548,8 +601,8 @@ if [ "$OFFLINE_MODE" = true ]; then
     NEXTFLOW_SOURCE="$PIPELINE_DIR/main.nf"
     NEXTFLOW_REV_ARGS=()
     NEXTFLOW_OFFLINE_ARGS=(
-        --offline true
-        --igenomes_ignore true
+        --offline
+        --igenomes_ignore
         --nextclade_dataset "$OFFLINE_NEXTCLADE_DATASET"
         --artic_model_dir "$OFFLINE_ARTIC_MODEL_DIR"
     )
@@ -565,9 +618,9 @@ nextflow run "$NEXTFLOW_SOURCE" \
     "${NEXTFLOW_INPUT_ARGS[@]}" \
     --outdir "$HOME/$RUN" \
     --runid "$RUN" \
-    --spike "$SARS_DATABASE/Spike_mAbs_inhibitors.csv" \
-    --rdrp "$SARS_DATABASE/RdRP_inhibitors.csv" \
-    --clpro "$SARS_DATABASE/3CLpro_inhibitors.csv" \
+    --spike "$SPIKE_TABLE" \
+    --rdrp "$RDRP_TABLE" \
+    --clpro "$CLPRO_TABLE" \
     --release_version "v1.0.0" \
     "${NEXTFLOW_OFFLINE_ARGS[@]}"
 
