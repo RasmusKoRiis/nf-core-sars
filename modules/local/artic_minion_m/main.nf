@@ -9,6 +9,7 @@ process ARTIC_MINION_M {
     tuple val(meta), path(gp_fastq)
     path  bed
     path  ref
+    path  local_model_dir
 
   output:
     tuple val(meta), path("${meta.id}.consensus.fasta"), emit: artic_consensus
@@ -22,12 +23,27 @@ process ARTIC_MINION_M {
           path("${meta.id}.primertrimmed.rg.sorted.bam"),
           path("${meta.id}.primertrimmed.rg.sorted.bam.bai"),
           emit: artic_bam
+    path("versions.yml"), emit: versions
 
   script:
   def MODELOPT = (params.artic_model ? "--model ${params.artic_model}" : "").trim()
   def AMBIGMIN = params.artic_iupac_min_af.toString()
   def AMBIGMAX = params.artic_iupac_max_af.toString()
   def MINDEPTH = params.min_depth.toString()
+  def OFFLINE = params.offline.toString().toBoolean()
+  def MODEL_SETUP = OFFLINE
+    ? '''
+# Use pre-downloaded ARTIC/Clair3 models in offline mode.
+MODELDIR="__ARTIC_MODEL_DIR__"
+[ -d "$MODELDIR" ] || { echo "ERROR: Offline ARTIC model directory is missing: $MODELDIR"; exit 2; }
+[ "$(find "$MODELDIR" -mindepth 1 -maxdepth 1 | wc -l)" -gt 0 ] || { echo "ERROR: Offline ARTIC model directory is empty: $MODELDIR"; exit 2; }
+'''
+    : '''
+# Clair3 models (best effort)
+MODELDIR="$PWD/clair3_models"
+mkdir -p "$MODELDIR"
+artic_get_models --model-dir "$MODELDIR" || true
+'''
 
   def cmd = '''
 set -euo pipefail
@@ -50,10 +66,7 @@ awk -F'\\t' '
   { print "ERROR: Unsupported BED line with " NF " columns: " $0 > "/dev/stderr"; exit 11 }
 ' "__BED__" > "$BED7"
 
-# Clair3 models (best effort)
-MODELDIR="$PWD/clair3_models"
-mkdir -p "$MODELDIR"
-artic_get_models --model-dir "$MODELDIR" || true
+__MODEL_SETUP__
 
 # Run ARTIC
 artic minion \
@@ -336,6 +349,12 @@ fi
 
 echo "Final header:"
 grep -m1 '^>' "__METAID__.consensus.fasta" || true
+
+cat <<-END_VERSIONS > versions.yml
+"__TASK_PROCESS__":
+    artic: $(artic --version 2>&1 | head -n 1)
+    samtools: $(samtools --version 2>&1 | head -n 1 | sed 's/^samtools //')
+END_VERSIONS
 '''
 
   cmd = cmd
@@ -348,7 +367,46 @@ grep -m1 '^>' "__METAID__.consensus.fasta" || true
     .replace('__AMBIGMIN__', AMBIGMIN)
     .replace('__AMBIGMAX__', AMBIGMAX)
     .replace('__MINDEPTH__', MINDEPTH)
+    .replace('__TASK_PROCESS__', task.process.toString())
+    .replace('__ARTIC_MODEL_DIR__', OFFLINE ? local_model_dir.toString() : '')
+    .replace('__MODEL_SETUP__', MODEL_SETUP)
     .replace('__MODELOPT__', MODELOPT)
 
   return cmd
+
+  stub:
+  """
+  cat <<EOF > ${meta.id}.consensus.fasta
+  >${meta.id}
+  ACGTAC
+  EOF
+
+  cat <<EOF > ${meta.id}.consensus.iupac.fasta
+  >${meta.id}
+  ACGTAC
+  EOF
+
+  cat <<EOF > ${meta.id}.consensus.artic-original.fasta
+  >${meta.id}
+  ACGTAC
+  EOF
+
+  cat <<EOF > ${meta.id}.consensus.iupac.report.txt
+  status=success
+  changed_positions=0
+  EOF
+
+  touch ${meta.id}.normalised.vcf.gz
+  touch ${meta.id}.normalised.vcf.gz.tbi
+  touch ${meta.id}.normalised.iupac-af.vcf.gz
+  touch ${meta.id}.normalised.iupac-af.vcf.gz.tbi
+  touch ${meta.id}.primertrimmed.rg.sorted.bam
+  touch ${meta.id}.primertrimmed.rg.sorted.bam.bai
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+      artic: "stub"
+      samtools: "stub"
+  END_VERSIONS
+  """
 }
