@@ -92,6 +92,24 @@ Use local FASTQ and samplesheet paths on the offline computer:
 ```
 
 The FASTQ directory must contain barcode directories matching the `Barcode` column in the samplesheet.
+By default, output is written to:
+
+```text
+$SARS_OFFLINE/results/<RUN>
+```
+
+To choose a different output directory:
+
+```bash
+"$SARS_OFFLINE/run_offline_sars.sh" \
+    -r <RUN> \
+    -p <PRIMER> \
+    -a sars \
+    -y <YEAR> \
+    --local-fastq-dir /path/to/fastq_pass \
+    --local-samplesheet /path/to/samplesheet.csv \
+    --outdir /path/to/output/<RUN>
+```
 
 Example layout:
 
@@ -132,7 +150,11 @@ The FASTA workflow skips ARTIC/primer processing and runs downstream Nextclade/r
 ```bash
 NXF_HOME="$SARS_OFFLINE/nextflow_home"
 PIPELINE_DIR="$SARS_OFFLINE/nf-core-sars"
+BASE_DIR="$SARS_OFFLINE/runtime"
+TMP_DIR="$SARS_OFFLINE/runtime/fastq"
+SARS_DATABASE="$SARS_OFFLINE/assets"
 OFFLINE_BASE="$SARS_OFFLINE/assets/offline"
+OFFLINE_OUTDIR_BASE="$SARS_OFFLINE/results"
 PIPELINE_ASSETS_DIR="$SARS_OFFLINE/nf-core-sars/assets"
 ```
 

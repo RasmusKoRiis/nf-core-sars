@@ -186,7 +186,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export NXF_HOME="${NXF_HOME:-$SCRIPT_DIR/nextflow_home}"
 export PIPELINE_DIR="${PIPELINE_DIR:-$SCRIPT_DIR/nf-core-sars}"
+export BASE_DIR="${BASE_DIR:-$SCRIPT_DIR/runtime}"
+export TMP_DIR="${TMP_DIR:-$BASE_DIR/fastq}"
+export SARS_DATABASE="${SARS_DATABASE:-$SCRIPT_DIR/assets}"
 export OFFLINE_BASE="${OFFLINE_BASE:-$SCRIPT_DIR/assets/offline}"
+export OFFLINE_OUTDIR_BASE="${OFFLINE_OUTDIR_BASE:-$SCRIPT_DIR/results}"
 export PIPELINE_ASSETS_DIR="${PIPELINE_ASSETS_DIR:-$PIPELINE_DIR/assets}"
 
 exec "$PIPELINE_DIR/wrapper-sars-wgs-fixed.sh" -o "$@"
@@ -215,6 +219,15 @@ Run FASTQ workflow:
       --local-fastq-dir /path/to/fastq_pass \\
       --local-samplesheet /path/to/samplesheet.csv
 
+Output defaults to:
+  "$BUNDLE_DIR/results/<RUN>"
+
+To override:
+  "$BUNDLE_DIR/run_offline_sars.sh" -r <RUN> -p <PRIMER> -a sars -y <YEAR> \\
+      --local-fastq-dir /path/to/fastq_pass \\
+      --local-samplesheet /path/to/samplesheet.csv \\
+      --outdir /path/to/output/<RUN>
+
 Run FASTA workflow:
   "$BUNDLE_DIR/run_offline_sars.sh" -r <RUN> -a sars -y <YEAR> \\
       --local-fasta "/path/to/*.fasta"
@@ -222,7 +235,11 @@ Run FASTA workflow:
 The launcher sets:
   NXF_HOME="$BUNDLE_NEXTFLOW_HOME"
   PIPELINE_DIR="$BUNDLE_PIPELINE_DIR"
+  BASE_DIR="$BUNDLE_DIR/runtime"
+  TMP_DIR="$BUNDLE_DIR/runtime/fastq"
+  SARS_DATABASE="$BUNDLE_DIR/assets"
   OFFLINE_BASE="$BUNDLE_OFFLINE_BASE"
+  OFFLINE_OUTDIR_BASE="$BUNDLE_DIR/results"
   PIPELINE_ASSETS_DIR="$BUNDLE_PIPELINE_DIR/assets"
 EOF
 
