@@ -191,6 +191,7 @@ export TMP_DIR="${TMP_DIR:-$BASE_DIR/fastq}"
 export SARS_DATABASE="${SARS_DATABASE:-$SCRIPT_DIR/assets}"
 export OFFLINE_BASE="${OFFLINE_BASE:-$SCRIPT_DIR/assets/offline}"
 export OFFLINE_OUTDIR_BASE="${OFFLINE_OUTDIR_BASE:-$SCRIPT_DIR/results}"
+export OFFLINE_WORKDIR_BASE="${OFFLINE_WORKDIR_BASE:-$SCRIPT_DIR/work}"
 export PIPELINE_ASSETS_DIR="${PIPELINE_ASSETS_DIR:-$PIPELINE_DIR/assets}"
 
 exec "$PIPELINE_DIR/wrapper-sars-wgs-fixed.sh" -o "$@"
@@ -222,11 +223,21 @@ Run FASTQ workflow:
 Output defaults to:
   "$BUNDLE_DIR/results/<RUN>"
 
+Nextflow work directories default to:
+  "$BUNDLE_DIR/work/<RUN>"
+
 To override:
   "$BUNDLE_DIR/run_offline_sars.sh" -r <RUN> -p <PRIMER> -a sars -y <YEAR> \\
       --local-fastq-dir /path/to/fastq_pass \\
       --local-samplesheet /path/to/samplesheet.csv \\
       --outdir /path/to/output/<RUN>
+
+To override both result and work directories:
+  "$BUNDLE_DIR/run_offline_sars.sh" -r <RUN> -p <PRIMER> -a sars -y <YEAR> \\
+      --local-fastq-dir /path/to/fastq_pass \\
+      --local-samplesheet /path/to/samplesheet.csv \\
+      --outdir /path/to/output/<RUN> \\
+      --workdir /path/to/work/<RUN>
 
 Run FASTA workflow:
   "$BUNDLE_DIR/run_offline_sars.sh" -r <RUN> -a sars -y <YEAR> \\
@@ -240,6 +251,7 @@ The launcher sets:
   SARS_DATABASE="$BUNDLE_DIR/assets"
   OFFLINE_BASE="$BUNDLE_OFFLINE_BASE"
   OFFLINE_OUTDIR_BASE="$BUNDLE_DIR/results"
+  OFFLINE_WORKDIR_BASE="$BUNDLE_DIR/work"
   PIPELINE_ASSETS_DIR="$BUNDLE_PIPELINE_DIR/assets"
 EOF
 
