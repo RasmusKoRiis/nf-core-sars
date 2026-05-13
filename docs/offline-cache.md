@@ -49,6 +49,21 @@ OFFLINE_ARTIC_MODEL_DIR="/mnt/tempdata/sars_db/assets/offline/artic_models" \
 ./wrapper-sars-wgs-fixed.sh -o -r <RUN> -p <PRIMER> -a sars -y <YEAR>
 ```
 
+To store Nextflow work files somewhere specific, pass `--workdir`:
+
+```bash
+PIPELINE_DIR="$HOME/nf-core-sars" \
+./wrapper-sars-wgs-fixed.sh \
+    -o \
+    -r <RUN> \
+    -p <PRIMER> \
+    -a sars \
+    -y <YEAR> \
+    --workdir /path/to/work/<RUN>
+```
+
+For offline harddrive bundles, the launcher defaults this to `$SARS_OFFLINE/work/<RUN>`. Override the default base with `OFFLINE_WORKDIR_BASE` or set a per-run path with `--workdir`.
+
 ## Repo Asset Fallback
 
 The wrapper uses `/mnt/tempdata/sars_db/assets` first for primer resources and mutation lookup tables. If a file or primer folder is missing there, it falls back to local pipeline assets:

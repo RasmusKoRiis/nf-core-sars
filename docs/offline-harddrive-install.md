@@ -98,6 +98,12 @@ By default, output is written to:
 $SARS_OFFLINE/results/<RUN>
 ```
 
+By default, Nextflow work files are written to:
+
+```text
+$SARS_OFFLINE/work/<RUN>
+```
+
 To choose a different output directory:
 
 ```bash
@@ -110,6 +116,21 @@ To choose a different output directory:
     --local-samplesheet /path/to/samplesheet.csv \
     --outdir /path/to/output/<RUN>
 ```
+
+To choose a different Nextflow work directory:
+
+```bash
+"$SARS_OFFLINE/run_offline_sars.sh" \
+    -r <RUN> \
+    -p <PRIMER> \
+    -a sars \
+    -y <YEAR> \
+    --local-fastq-dir /path/to/fastq_pass \
+    --local-samplesheet /path/to/samplesheet.csv \
+    --workdir /path/to/work/<RUN>
+```
+
+You can combine `--outdir` and `--workdir` when results and temporary work files should be stored on different disks.
 
 Example layout:
 
@@ -155,6 +176,7 @@ TMP_DIR="$SARS_OFFLINE/runtime/fastq"
 SARS_DATABASE="$SARS_OFFLINE/assets"
 OFFLINE_BASE="$SARS_OFFLINE/assets/offline"
 OFFLINE_OUTDIR_BASE="$SARS_OFFLINE/results"
+OFFLINE_WORKDIR_BASE="$SARS_OFFLINE/work"
 PIPELINE_ASSETS_DIR="$SARS_OFFLINE/nf-core-sars/assets"
 ```
 

@@ -6,7 +6,8 @@ process IRMA {
 
     //conda "bioconda::irma=1.0.3"
     //container 'docker.io/rasmuskriis/cdc_irma_custom:1.0'
-    container 'docker.io/cdcgov/irma:latest'
+    //container 'docker.io/cdcgov/irma:latest'
+    container 'docker.io/cdcgov/irma:v1.3.1'
     containerOptions = "-v ${baseDir}/bin:/project-bin" // Mount the bin directory
 
     //container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
