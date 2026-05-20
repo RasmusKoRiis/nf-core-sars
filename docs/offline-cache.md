@@ -29,6 +29,8 @@ By default this populates:
 
 It also pulls the Docker images required by `wrapper-sars-wgs-fixed.sh -o`, installs/caches `nf-schema@2.5.1`, and runs `nextflow pull RasmusKoRiis/nf-core-sars -r master`.
 
+When `--offline` is used, the pipeline loads `conf/offline.config` and caps process CPU requests at 8 CPUs. Online runs and normal server runs keep their existing CPU settings.
+
 ## Custom Paths
 
 Use custom paths if the cache is stored elsewhere:

@@ -20,6 +20,8 @@ process REPORT {
     
     output:
     path("${runid}.csv"), emit: report
+    path("${runid}_without_software_versions.csv"), emit: report_without_versions
+    path("${runid}_with_software_versions.csv"), emit: report_with_versions
     path("${runid}.fasta"), emit: report_fasta
     path("versions.yml"), emit: versions
 
@@ -104,7 +106,12 @@ process REPORT {
     print("; ".join(parts))
     PY
 
-    python3 - ${runid}_temp5.csv version_control_metadata.txt ${runid}_temp6.csv <<'PY'
+    # QC calculations for the primary report without software-version metadata
+    python /project-bin/report_QC_calculation.py ${runid}_temp5.csv -o ${runid}.csv
+    cp ${runid}.csv ${runid}_without_software_versions.csv
+
+    # Add software-version metadata to a separate full report
+    python3 - ${runid}.csv version_control_metadata.txt ${runid}_with_software_versions.csv <<'PY'
     import csv
     import sys
 
@@ -116,13 +123,10 @@ process REPORT {
         reader = csv.reader(in_fh)
         writer = csv.writer(out_fh)
         header = next(reader)
-        writer.writerow(header + ["Version Control Metadata"])
+        writer.writerow(header + ["NGS_Script_vers"])
         for row in reader:
             writer.writerow(row + [metadata])
     PY
-
-    # QC calculations
-    python /project-bin/report_QC_calculation.py ${runid}_temp6.csv -o ${runid}.csv
 
     # Make Multiple FASTA file for all samples
     cat ${fasta} > ${runid}.fasta
@@ -136,8 +140,15 @@ process REPORT {
     stub:
     """
     cat <<EOF > ${runid}.csv
-    Sample,RunID,Release Version,Version Control Metadata
-    sample1,${runid},${release_version},${version_control_metadata}; REPORT.python=stub
+    Sample,RunID,Release Version,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar
+    sample1,${runid},${release_version},,,
+    EOF
+
+    cp ${runid}.csv ${runid}_without_software_versions.csv
+
+    cat <<EOF > ${runid}_with_software_versions.csv
+    Sample,RunID,Release Version,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar,NGS_Script_vers
+    sample1,${runid},${release_version},,,,${version_control_metadata}; REPORT.python=stub
     EOF
 
     cat <<EOF > ${runid}.fasta
