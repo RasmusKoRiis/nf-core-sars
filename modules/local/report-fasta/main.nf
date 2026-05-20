@@ -18,6 +18,7 @@ process REPORTFASTA {
 
     output:
     path("${runid}.csv"), emit: report
+    path("${runid}_without_software_versions.csv"), emit: report_without_versions
     path("${runid}_with_software_versions.csv"), emit: report_with_versions
     path("versions.yml"), emit: versions
 
@@ -88,6 +89,7 @@ process REPORTFASTA {
 
     # QC calculations for the primary report without software-version metadata
     python /project-bin/report_QC_calculation.py ${runid}_temp2.csv -o ${runid}.csv
+    cp ${runid}.csv ${runid}_without_software_versions.csv
 
     # Add software-version metadata to a separate full report
     python3 - ${runid}.csv version_control_metadata.txt ${runid}_with_software_versions.csv <<'PY'
@@ -119,6 +121,8 @@ process REPORTFASTA {
     Sample,RunID,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar
     sample1,${runid},,,
     EOF
+
+    cp ${runid}.csv ${runid}_without_software_versions.csv
 
     cat <<EOF > ${runid}_with_software_versions.csv
     Sample,RunID,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar,NGS_Script_vers

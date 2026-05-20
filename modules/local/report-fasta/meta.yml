@@ -29,6 +29,10 @@ output:
       type: file
       description: Final run-level CSV report without software-version metadata.
       pattern: "*.csv"
+  - report_without_versions:
+      type: file
+      description: Explicit copy of the final run-level CSV report without software-version metadata.
+      pattern: "*_without_software_versions.csv"
   - report_with_versions:
       type: file
       description: Final run-level CSV report with software-version metadata.

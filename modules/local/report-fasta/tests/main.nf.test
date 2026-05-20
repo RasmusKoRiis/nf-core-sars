@@ -29,6 +29,7 @@ nextflow_process {
             assertAll(
                 { assert process.success },
                 { assert file(process.out.report[0]).getName() == 'RUN001.csv' },
+                { assert file(process.out.report_without_versions[0]).getName() == 'RUN001_without_software_versions.csv' },
                 { assert file(process.out.report_with_versions[0]).getName() == 'RUN001_with_software_versions.csv' },
                 { assert path(process.out.versions.get(0)).text.contains('stub') }
             )
