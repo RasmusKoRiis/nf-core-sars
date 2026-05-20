@@ -19,6 +19,8 @@ nextflow_process {
                 input[1] = file(params.local_test_data + '/module_test_report_mutations.csv', checkIfExists: true)
                 input[2] = file(params.local_test_data + '/module_test_report_resistance.csv', checkIfExists: true)
                 input[3] = "RUN001"
+                input[4] = file(params.local_test_data + '/module_test_report_stats.csv', checkIfExists: true)
+                input[5] = "pipeline=test"
                 """
             }
         }
@@ -27,6 +29,7 @@ nextflow_process {
             assertAll(
                 { assert process.success },
                 { assert file(process.out.report[0]).getName() == 'RUN001.csv' },
+                { assert file(process.out.report_with_versions[0]).getName() == 'RUN001_with_software_versions.csv' },
                 { assert path(process.out.versions.get(0)).text.contains('stub') }
             )
         }

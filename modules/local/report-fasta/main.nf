@@ -18,6 +18,7 @@ process REPORTFASTA {
 
     output:
     path("${runid}.csv"), emit: report
+    path("${runid}_with_software_versions.csv"), emit: report_with_versions
     path("versions.yml"), emit: versions
 
 
@@ -34,7 +35,7 @@ process REPORTFASTA {
     # Generate date
     current_date=\$(date '+%Y-%m-%d')
 
-    python /project-bin/report-fasta.py
+    python /project-bin/report.py
 
     #Add constant parameters to the report
     # Add RunID column
@@ -85,7 +86,11 @@ process REPORTFASTA {
     print("; ".join(parts))
     PY
 
-    python3 - ${runid}_temp2.csv version_control_metadata.txt ${runid}.csv <<'PY'
+    # QC calculations for the primary report without software-version metadata
+    python /project-bin/report_QC_calculation.py ${runid}_temp2.csv -o ${runid}.csv
+
+    # Add software-version metadata to a separate full report
+    python3 - ${runid}.csv version_control_metadata.txt ${runid}_with_software_versions.csv <<'PY'
     import csv
     import sys
 
@@ -97,7 +102,7 @@ process REPORTFASTA {
         reader = csv.reader(in_fh)
         writer = csv.writer(out_fh)
         header = next(reader)
-        writer.writerow(header + ["Version Control Metadata"])
+        writer.writerow(header + ["NGS_Script_vers"])
         for row in reader:
             writer.writerow(row + [metadata])
     PY
@@ -111,8 +116,13 @@ process REPORTFASTA {
     stub:
     """
     cat <<EOF > ${runid}.csv
-    Sample,RunID,Version Control Metadata
-    sample1,${runid},${version_control_metadata}; REPORTFASTA.python=stub
+    Sample,RunID,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar
+    sample1,${runid},,,
+    EOF
+
+    cat <<EOF > ${runid}_with_software_versions.csv
+    Sample,RunID,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar,NGS_Script_vers
+    sample1,${runid},,,,${version_control_metadata}; REPORTFASTA.python=stub
     EOF
 
     cat <<-END_VERSIONS > versions.yml

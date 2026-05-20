@@ -40,6 +40,8 @@ SARS_OFFLINE/
 
 The script also downloads the Nextclade dataset, ARTIC/Clair3 models, `nf-schema@2.5.1`, the required Docker images, and exports the Docker images to `docker/sars-docker-images.tar`.
 
+Offline runs apply an offline-only Nextflow resource cap: no process is configured to request more than 8 CPUs. Normal online/server runs keep the standard profile CPU settings.
+
 To also include optional images used by non-wrapper modules:
 
 ```bash

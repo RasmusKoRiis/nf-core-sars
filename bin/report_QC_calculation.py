@@ -83,6 +83,7 @@ def process_file(in_csv: Path, out_csv: Path, lc_min: float, lc_max: float) -> N
     df = normalize_blanks(df)
     df["NGS_QC_Sum"] = df.apply(lambda r: build_qc_string(r, lc_min, lc_max), axis=1)
     df["GISAID_Comment"] = df["NGS_QC_Sum"].apply(lambda x: "Review" if str(x).strip() else "")
+    df["GISAID_Kommentar"] = df["GISAID_Comment"]
     df.to_csv(out_csv, index=False, na_rep="NA")
     print(f"Wrote processed file to {out_csv}")
 

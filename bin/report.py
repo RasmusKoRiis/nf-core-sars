@@ -222,6 +222,9 @@ for c in rep.columns:
     if (c in NA_ALWAYS) or (isinstance(c,str) and GENE_AA_COL.match(c)):
         rep[c] = rep[c].apply(blank_to_NA)
 
+# Drop internal helper columns before writing the final report.
+rep = rep.drop(columns=['_overall_pct', '_cds_map'], errors='ignore')
+
 # Write with Sample first
 cols = list(rep.columns)
 rep = rep[['Sample'] + [c for c in cols if c != 'Sample']]
