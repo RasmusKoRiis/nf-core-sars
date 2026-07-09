@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Activate conda base functions
-CONDA_PROFILE="${CONDA_PROFILE:-$HOME/miniconda3/etc/profile.d/conda.sh}"
-if [ -f "$CONDA_PROFILE" ]; then
-    source "$CONDA_PROFILE"
-elif command -v conda >/dev/null 2>&1; then
+# Initialize conda from the current machine
+if command -v conda >/dev/null 2>&1; then
     eval "$(conda shell.bash hook)"
 else
-    echo "ERROR: Could not initialize conda."
-    echo "Set CONDA_PROFILE=/path/to/conda.sh or make conda available in PATH."
+    echo "ERROR: conda is not available in PATH."
+    echo "Install Miniconda/Mambaforge, then create the NEXTFLOW environment."
     exit 1
 fi
 
