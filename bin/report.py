@@ -225,6 +225,10 @@ for c in rep.columns:
 # Drop internal helper columns before writing the final report.
 rep = rep.drop(columns=['_overall_pct', '_cds_map'], errors='ignore')
 
+# Use semicolons within Spike lists, including those from older lookup outputs.
+if 'Spike_mAbs_inhibitors' in rep.columns:
+    rep['Spike_mAbs_inhibitors'] = rep['Spike_mAbs_inhibitors'].str.replace(',', ';', regex=False)
+
 # Write with Sample first
 cols = list(rep.columns)
 rep = rep[['Sample'] + [c for c in cols if c != 'Sample']]

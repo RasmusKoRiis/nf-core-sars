@@ -234,7 +234,7 @@ for _, r in main_df.iterrows():
         s_nc   = gather_gene_muts(r, 'S')
         s_disp = to_lookup(s_nc, spike_df)
         s_fold = max_fold(s_nc, spike_df, SPIKE_FOLD_COL)
-        out['Spike_mAbs_inhibitors'] = ",".join(s_disp) if s_disp else 'No Mutations'
+        out['Spike_mAbs_inhibitors'] = ";".join(s_disp) if s_disp else 'No Mutations'
         out['Spike_Fold'] = s_fold if s_fold is not None else 'No Data'
     else:
         mask_nextclade_fields(out, genes_of_interest, 'S')
