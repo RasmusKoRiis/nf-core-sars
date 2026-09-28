@@ -8,6 +8,7 @@ include { CSV_CONVERSION } from '../modules/local/csv_conversion/main'
 include { NEXTCLADE      } from '../modules/local/nextclade/main'
 include { REPORTFASTA    } from '../modules/local/report-fasta/main'
 include { SPLIT_FASTA    } from '../modules/local/split_fasta/main'
+include { PRIMER_CHECK_RUN } from '../subworkflows/local/primer_check/main'
 include { TABLELOOKUP    } from '../modules/local/tablelookup/main'
 
 /*
@@ -89,6 +90,17 @@ workflow SARSCOVSEQFASTA {
                 tuple([id: splitFasta.getBaseName()], splitFasta)
             }
         }
+
+    if (params.primer_check) {
+        PRIMER_CHECK_RUN(
+            ch_single_seq.map { meta, fasta -> tuple(meta, fasta, []) },
+            [virus: 'SARS-CoV-2', run_id: params.runid, assays: ['pcr', 'ngs'],
+             ngs_dir: params.primer_check_ngs_dir ?: params.primerdir,
+             ngs_scheme: params.primer_set_name ?: ((params.primer_check_ngs_dir ?: params.primerdir) ?
+                 file(params.primer_check_ngs_dir ?: params.primerdir).getFileName().toString() : ''),
+             offline: params.offline.toString().toBoolean()]
+        )
+    }
 
     NEXTCLADE(
         ch_single_seq,
