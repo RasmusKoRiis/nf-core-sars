@@ -224,16 +224,6 @@ workflow SARSCOVSEQ {
         Channel.value(primerBedFile)
     )
 
-    if (params.primer_check) {
-        PRIMER_CHECK_RUN(
-            ARTIC_MINION_M.out.artic_consensus.map { meta, fasta -> tuple(meta, fasta, []) },
-            [virus: 'SARS-CoV-2', run_id: params.runid, assays: ['pcr', 'ngs'],
-             ngs_dir: params.primer_check_ngs_dir ?: (primerDirPath ?: bedParent),
-             ngs_scheme: params.primer_check_ngs_dir ? file(params.primer_check_ngs_dir).getFileName().toString() : primerSetName,
-             offline: params.offline.toString().toBoolean()]
-        )
-    }
-
     PRIMER_MISMATCH(
         ARTIC_MINION_M.out.artic_consensus,
         BUILD_PRIMER_DB.out.primer_db,
@@ -278,4 +268,15 @@ workflow SARSCOVSEQ {
         ch_report_tool_versions.collect(),
         reportVersionControlMetadata
     )
+
+    if (params.primer_check) {
+        PRIMER_CHECK_RUN(
+            REPORT.out.report_fasta,
+            ARTIC_MINION_M.out.artic_consensus.map { meta, fasta -> tuple(meta, fasta, []) },
+            [virus: 'SARS-CoV-2', run_id: params.runid, assays: ['pcr', 'ngs'],
+             ngs_dir: params.primer_check_ngs_dir ?: (primerDirPath ?: bedParent),
+             ngs_scheme: params.primer_check_ngs_dir ? file(params.primer_check_ngs_dir).getFileName().toString() : primerSetName,
+             offline: params.offline.toString().toBoolean()]
+        )
+    }
 }

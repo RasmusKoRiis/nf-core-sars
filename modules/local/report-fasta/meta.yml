@@ -24,6 +24,15 @@ input:
   - runid:
       type: string
       description: Run identifier for the final report.
+  - tool_versions:
+      type: file
+      description: Software versions from upstream processes.
+  - version_control_metadata:
+      type: string
+      description: Pipeline revision metadata included in the report.
+  - fasta:
+      type: file
+      description: Consensus FASTAs concatenated into the final run export.
 output:
   - report:
       type: file
@@ -37,6 +46,10 @@ output:
       type: file
       description: Final run-level CSV report with software-version metadata.
       pattern: "*_with_software_versions.csv"
+  - report_fasta:
+      type: file
+      description: Final combined consensus FASTA used for primer checking.
+      pattern: "*.fasta"
   - versions:
       type: file
       description: File containing software versions.

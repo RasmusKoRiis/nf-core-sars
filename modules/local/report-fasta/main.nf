@@ -14,12 +14,14 @@ process REPORTFASTA {
     val runid
     path(tool_versions, stageAs: 'tool_versions/version_??.yml')
     val version_control_metadata
+    path(fasta, stageAs: 'consensus??.fa')
 
 
     output:
     path("${runid}.csv"), emit: report
     path("${runid}_without_software_versions.csv"), emit: report_without_versions
     path("${runid}_with_software_versions.csv"), emit: report_with_versions
+    path("${runid}.fasta"), emit: report_fasta
     path("versions.yml"), emit: versions
 
 
@@ -109,6 +111,8 @@ process REPORTFASTA {
             writer.writerow(row + [metadata])
     PY
 
+    cat consensus*.fa > ${runid}.fasta
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python3 --version 2>&1 | sed 's/Python //')
@@ -117,6 +121,8 @@ process REPORTFASTA {
 
     stub:
     """
+    cat consensus*.fa > ${runid}.fasta
+
     cat <<EOF > ${runid}.csv
     Sample,RunID,NGS_QC_Sum,GISAID_Comment,GISAID_Kommentar
     sample1,${runid},,,

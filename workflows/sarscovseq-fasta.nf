@@ -91,17 +91,6 @@ workflow SARSCOVSEQFASTA {
             }
         }
 
-    if (params.primer_check) {
-        PRIMER_CHECK_RUN(
-            ch_single_seq.map { meta, fasta -> tuple(meta, fasta, []) },
-            [virus: 'SARS-CoV-2', run_id: params.runid, assays: ['pcr', 'ngs'],
-             ngs_dir: params.primer_check_ngs_dir ?: params.primerdir,
-             ngs_scheme: params.primer_set_name ?: ((params.primer_check_ngs_dir ?: params.primerdir) ?
-                 file(params.primer_check_ngs_dir ?: params.primerdir).getFileName().toString() : ''),
-             offline: params.offline.toString().toBoolean()]
-        )
-    }
-
     NEXTCLADE(
         ch_single_seq,
         Channel.value(nextcladeDataset)
@@ -127,6 +116,19 @@ workflow SARSCOVSEQFASTA {
         TABLELOOKUP.out.resistance_mutations_report.collect(),
         params.runid,
         ch_report_tool_versions.collect(),
-        reportVersionControlMetadata
+        reportVersionControlMetadata,
+        ch_single_seq.map { meta, fasta -> fasta }.collect()
     )
+
+    if (params.primer_check) {
+        PRIMER_CHECK_RUN(
+            REPORTFASTA.out.report_fasta,
+            ch_single_seq.map { meta, fasta -> tuple(meta, fasta, []) },
+            [virus: 'SARS-CoV-2', run_id: params.runid, assays: ['pcr', 'ngs'],
+             ngs_dir: params.primer_check_ngs_dir ?: params.primerdir,
+             ngs_scheme: params.primer_set_name ?: ((params.primer_check_ngs_dir ?: params.primerdir) ?
+                 file(params.primer_check_ngs_dir ?: params.primerdir).getFileName().toString() : ''),
+             offline: params.offline.toString().toBoolean()]
+        )
+    }
 }

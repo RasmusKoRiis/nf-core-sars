@@ -27,6 +27,7 @@ usage() {
     echo "  -y <year>          Specify the year directory of the fastq files on the N-drive (required)"
     echo "  -v <validation>    Specify validation flag (e.g., VER)"
     echo "  -b <branch>        Pipeline branch/tag to use (default: master)"
+    echo "  -P <path>          PCR JSON file or directory (default: /mnt/tempdata/sars_db/pcr-primers)"
     echo "  -o                 Run in offline mode using local cached pipeline/resources"
     echo "  --local-fastq-dir <dir>"
     echo "                     Use a local FASTQ samples directory instead of copying from the N-drive"
@@ -60,6 +61,9 @@ YEAR=""
 PRIMER=""
 VALIDATION_FLAG=""
 PIPELINE_BRANCH="master"
+PRIMER_CHECK_PCR="${PRIMER_CHECK_PCR:-/mnt/tempdata/sars_db/pcr-primers}"
+PRIMER_CHECK_CONTAINER="${PRIMER_CHECK_CONTAINER:-ghcr.io/rasmuskoriis/primer-checker:latest}"
+PRIMER_CHECK_ENABLED="${PRIMER_CHECK_ENABLED:-true}"
 OFFLINE_MODE=false
 PIPELINE_DIR="${PIPELINE_DIR:-$HOME/.nextflow/assets/RasmusKoRiis/nf-core-sars}"
 LOCAL_FASTQ_DIR="${LOCAL_FASTQ_DIR:-}"
@@ -79,6 +83,7 @@ while [ "$#" -gt 0 ]; do
         -y|--year) YEAR="${2:?Missing value for $1}"; shift 2 ;;
         -v|--validation) VALIDATION_FLAG="${2:?Missing value for $1}"; shift 2 ;;
         -b|--branch) PIPELINE_BRANCH="${2:?Missing value for $1}"; shift 2 ;;
+        -P|--pcr-primers) PRIMER_CHECK_PCR="${2:?Missing value for $1}"; shift 2 ;;
         -o|--offline) OFFLINE_MODE=true; shift ;;
         --local-fastq-dir) LOCAL_FASTQ_DIR="${2:?Missing value for $1}"; shift 2 ;;
         --local-samplesheet) LOCAL_SAMPLESHEET="${2:?Missing value for $1}"; shift 2 ;;
@@ -668,6 +673,9 @@ nextflow run "$NEXTFLOW_SOURCE" \
     "${NEXTFLOW_INPUT_ARGS[@]}" \
     --outdir "$NEXTFLOW_OUTDIR" \
     --runid "$RUN" \
+    --primer_check "$PRIMER_CHECK_ENABLED" \
+    --primer_check_pcr "$PRIMER_CHECK_PCR" \
+    --primer_check_container "$PRIMER_CHECK_CONTAINER" \
     --spike "$SPIKE_TABLE" \
     --rdrp "$RDRP_TABLE" \
     --clpro "$CLPRO_TABLE" \
