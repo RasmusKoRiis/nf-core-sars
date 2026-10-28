@@ -24,6 +24,9 @@ nextflow_process {
                 input[6] = file(params.local_test_data + '/module_test_samplesheet.csv', checkIfExists: true)
                 input[7] = "test_scheme"
                 input[8] = file(params.local_test_data + '/module_test_consensus.fasta', checkIfExists: true)
+                input[9] = file(params.local_test_data + '/module_test_consensus.fasta', checkIfExists: true)
+                input[10] = []
+                input[11] = "PipelineVersion=test"
                 """
             }
         }
@@ -35,6 +38,7 @@ nextflow_process {
                 { assert file(process.out.report_without_versions[0]).getName() == 'RUN001_without_software_versions.csv' },
                 { assert file(process.out.report_with_versions[0]).getName() == 'RUN001_with_software_versions.csv' },
                 { assert file(process.out.report_fasta[0]).getName() == 'RUN001.fasta' },
+                { assert file(process.out.report_iupac_fasta[0]).getName() == 'RUN001.iupac.fasta' },
                 { assert path(process.out.versions.get(0)).text.contains('stub') }
             )
         }

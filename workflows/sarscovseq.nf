@@ -265,6 +265,7 @@ workflow SARSCOVSEQ {
         Channel.value(sampleSheetFile),
         primerDisplayPath,
         ARTIC_MINION_M.out.artic_consensus_report.collect(),
+        ARTIC_MINION_M.out.artic_consensus_iupac.map { meta, fasta -> fasta }.collect(),
         ch_report_tool_versions.collect(),
         reportVersionControlMetadata
     )

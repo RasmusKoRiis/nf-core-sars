@@ -39,6 +39,9 @@ input:
   - fasta:
       type: file
       description: Consensus FASTA file(s) to concatenate into the run-level FASTA.
+  - iupac_fasta:
+      type: file
+      description: IUPAC consensus FASTA file(s) to concatenate into the run-level IUPAC FASTA.
 output:
   - report:
       type: file
@@ -56,6 +59,10 @@ output:
       type: file
       description: Concatenated FASTA output for the run.
       pattern: "*.fasta"
+  - report_iupac_fasta:
+      type: file
+      description: Concatenated IUPAC consensus FASTA output for the run.
+      pattern: "*.iupac.fasta"
   - versions:
       type: file
       description: File containing software versions.

@@ -15,6 +15,7 @@ process REPORT {
     path(samplesheet)
     val primer
     path(fasta)
+    path(iupac_fasta)
     path(tool_versions, stageAs: 'tool_versions/version_??.yml')
     val version_control_metadata
     
@@ -23,6 +24,7 @@ process REPORT {
     path("${runid}_without_software_versions.csv"), emit: report_without_versions
     path("${runid}_with_software_versions.csv"), emit: report_with_versions
     path("${runid}.fasta"), emit: report_fasta
+    path("${runid}.iupac.fasta"), emit: report_iupac_fasta
     path("versions.yml"), emit: versions
 
 
@@ -130,6 +132,7 @@ process REPORT {
 
     # Make Multiple FASTA file for all samples
     cat ${fasta} > ${runid}.fasta
+    cat ${iupac_fasta} > ${runid}.iupac.fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -155,6 +158,8 @@ process REPORT {
     >sample1
     ACGT
     EOF
+
+    cat ${iupac_fasta} > ${runid}.iupac.fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

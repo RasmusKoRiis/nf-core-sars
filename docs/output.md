@@ -25,6 +25,11 @@ Produced by the FASTA-oriented workflows when multi-record FASTA files are split
 
 The FASTQ workflow generates consensus FASTA files, BAM files, and related ARTIC outputs for each sample.
 
+The `report/` folder contains two combined FASTA files for all samples:
+
+- `<runid>.fasta`: consensus sequences.
+- `<runid>.iupac.fasta`: IUPAC consensus sequences, preserving ambiguity codes.
+
 ### `depth/`
 
 Per-position depth summaries derived from the ARTIC alignment workflow, including CSV tables for downstream QC review.
